@@ -24,16 +24,16 @@ pipeline_base:
 
   profiles:
     dev:
-      enabled: true
+      enabled: false
       description: "Fast iteration mode with smaller samples for development"
       mode: "sample"
       sample_rows: 200 #50000
       stratify_column: "IncidentGrade"
     prod:
-      enabled: false
+      enabled: true
       description: "Full-scale execution with larger samples for production analysis"
       mode: "sample"
-      sample_rows: 200000
+      sample_rows: 70000
       stratify_column: "IncidentGrade"
 
   common_phases_config:

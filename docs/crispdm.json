@@ -1,0 +1,128 @@
+[
+  {
+    "PHASE": "PHASE 2: DATA UNDERSTANDING",
+    "SUB_PHASE": "2.1 DATA_ACQUISITION",
+    "MENTAL_RULE": "Get the data and identify the source",
+    "GOAL_PROBLEM": "Data is unavailable, scattered, or siloed in multiple sources."
+  },
+  {
+    "PHASE": "PHASE 2: DATA UNDERSTANDING",
+    "SUB_PHASE": "2.2 DATA_DESCRIPTION",
+    "MENTAL_RULE": "Understand structure and basic content",
+    "GOAL_PROBLEM": "Lack of clarity on columns, data types, and distributions."
+  },
+  {
+    "PHASE": "PHASE 2: DATA UNDERSTANDING",
+    "SUB_PHASE": "2.3 DATA_QUALITY_VERIFICATION",
+    "MENTAL_RULE": "Spot quality issues (no fixing yet)",
+    "GOAL_PROBLEM": "Presence of errors, outliers, or inconsistencies of unknown scale."
+  },
+  {
+    "PHASE": "PHASE 2: DATA UNDERSTANDING",
+    "SUB_PHASE": "2.4 DATA_EXPLORATION",
+    "MENTAL_RULE": "Uncover patterns and relationships",
+    "GOAL_PROBLEM": "Unknown correlations or behaviors between variables."
+  },
+  {
+    "PHASE": "PHASE 3: DATA PREPARATION",
+    "SUB_PHASE": "3.1 DATA_SELECTION",
+    "MENTAL_RULE": "Decide WHAT goes in and what stays out",
+    "GOAL_PROBLEM": "Defining scope; avoiding data leakage and structural noise."
+  },
+  {
+    "PHASE": "PHASE 3: DATA PREPARATION",
+    "SUB_PHASE": "3.2 DATA_CLEANING",
+    "MENTAL_RULE": "Fix errors and noise without adding info",
+    "GOAL_PROBLEM": "Improving intrinsic quality by correcting inconsistencies."
+  },
+  {
+    "PHASE": "PHASE 3: DATA PREPARATION",
+    "SUB_PHASE": "3.3 DATA_TRANSFORMATION",
+    "MENTAL_RULE": "Change representation for better learning",
+    "GOAL_PROBLEM": "Reformatting features so the model can learn efficiently."
+  },
+  {
+    "PHASE": "PHASE 3: DATA PREPARATION",
+    "SUB_PHASE": "3.4 DATA_INTEGRATION",
+    "MENTAL_RULE": "Merge sources into one coherent dataset",
+    "GOAL_PROBLEM": "Unifying multiple sources into a consistent, aligned dataset."
+  },
+  {
+    "PHASE": "PHASE 3: DATA PREPARATION",
+    "SUB_PHASE": "3.5 DATA_FORMATTING",
+    "MENTAL_RULE": "Final polish for the algorithm",
+    "GOAL_PROBLEM": "Preparing data for ML consumption without changing its meaning."
+  },
+  {
+    "PHASE": "PHASE 4: DATA MODELING",
+    "SUB_PHASE": "4.1 TECHNIQUE_SELECTION",
+    "MENTAL_RULE": "Choose the right algorithm",
+    "GOAL_PROBLEM": "Selecting the model based on the problem type and assumptions."
+  },
+  {
+    "PHASE": "PHASE 4: DATA MODELING",
+    "SUB_PHASE": "4.2 MODEL_BUILDING",
+    "MENTAL_RULE": "Train the model",
+    "GOAL_PROBLEM": "Fitting the model and finding the optimal parameter set."
+  },
+  {
+    "PHASE": "PHASE 4: DATA MODELING",
+    "SUB_PHASE": "4.3 TEST_DESIGN",
+    "MENTAL_RULE": "Define how to prove it works",
+    "GOAL_PROBLEM": "Designing an evaluation strategy to prevent leakage."
+  },
+  {
+    "PHASE": "PHASE 4: DATA MODELING",
+    "SUB_PHASE": "4.4 MODEL_ASSESSMENT",
+    "MENTAL_RULE": "Evaluate the performance",
+    "GOAL_PROBLEM": "Objectively measuring quality based on the specific problem."
+  },
+  {
+    "PHASE": "PHASE 5: EVALUATION & INTERPRETATION",
+    "SUB_PHASE": "5.1 KNOWLEDGE_EXTRACTION",
+    "MENTAL_RULE": "Understand WHAT and WHY it learned",
+    "GOAL_PROBLEM": "Interpreting results, feature importance, or cluster meanings."
+  },
+  {
+    "PHASE": "PHASE 5: EVALUATION & INTERPRETATION",
+    "SUB_PHASE": "5.2 BUSINESS_EVALUATION",
+    "MENTAL_RULE": "Assess REAL business value",
+    "GOAL_PROBLEM": "Moving from technical metrics to cost reduction or profit."
+  },
+  {
+    "PHASE": "PHASE 5: EVALUATION & INTERPRETATION",
+    "SUB_PHASE": "5.3 PROCESS_REVIEW",
+    "MENTAL_RULE": "Audit the methodology",
+    "GOAL_PROBLEM": "Identifying methodological errors or unjustified decisions."
+  },
+  {
+    "PHASE": "PHASE 5: EVALUATION & INTERPRETATION",
+    "SUB_PHASE": "5.4 NEXT_STEPS_DECISION",
+    "MENTAL_RULE": "Decide the model's future",
+    "GOAL_PROBLEM": "Determining whether to deploy, iterate, or discard the project."
+  },
+  {
+    "PHASE": "PHASE 6: DEPLOYMENT",
+    "SUB_PHASE": "6.1 PLAN_DEPLOYMENT",
+    "MENTAL_RULE": "Strategize the integration into production",
+    "GOAL_PROBLEM": "Lack of a clear path to integrate the ML model into the existing business systems."
+  },
+  {
+    "PHASE": "PHASE 6: DEPLOYMENT",
+    "SUB_PHASE": "6.2 INFERENCE_ARCHITECTURE",
+    "MENTAL_RULE": "Setup serving logic (e.g., Cascade Inference)",
+    "GOAL_PROBLEM": "Handling complex prediction flows where one model's output triggers another without creating latency bottlenecks."
+  },
+  {
+    "PHASE": "PHASE 6: DEPLOYMENT",
+    "SUB_PHASE": "6.3 MONITORING_&_MAINTENANCE",
+    "MENTAL_RULE": "Track performance and data drift over time",
+    "GOAL_PROBLEM": "Models degrade silently in production due to concept drift or changing data distributions."
+  },
+  {
+    "PHASE": "PHASE 6: DEPLOYMENT",
+    "SUB_PHASE": "6.4 FINAL_REPORT_&_HANDOVER",
+    "MENTAL_RULE": "Document and transfer ownership",
+    "GOAL_PROBLEM": "Technical debt and knowledge loss if the data science team leaves the project without proper documentation."
+  }
+]

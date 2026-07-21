@@ -1,0 +1,69 @@
+{
+  "project": "phase2_data_understanding",
+  "pipeline_stages": {
+    "2.1_data_acquisition": {
+      "files": [
+        "2.1.data_acquisition.hierarchy_report.test.json",
+        "2.1.data_acquisition.hierarchy_report.train.json",
+        "2.1.data_acquisition.load_csv_test.json",
+        "2.1.data_acquisition.load_csv_train.json",
+        "2.1.data_acquisition.prod_70000_stratified_test.parquet",
+        "2.1.data_acquisition.prod_70000_stratified_train.parquet",
+        "2.1.data_acquisition.stats_comparison.json"
+      ]
+    },
+    "2.2_exploratory_analysis": {
+      "files": [
+        "2.2.categorical_analysis.cardinality_profiling.test.json",
+        "2.2.categorical_analysis.cardinality_profiling.train.json",
+        "2.2.categorical_analysis.multi_value_parsing.test.json",
+        "2.2.categorical_analysis.multi_value_parsing.train.json",
+        "2.2.categorical_analysis.target_distribution.test.json",
+        "2.2.categorical_analysis.target_distribution.train.json",
+        "2.2.descriptive_statistics.basic_stats.test.json",
+        "2.2.descriptive_statistics.basic_stats.train.json",
+        "2.2.schema_analysis.column_metadata.test.json",
+        "2.2.schema_analysis.column_metadata.train.json",
+        "2.2.schema_analysis.schema_comparison.json",
+        "2.2.special_feature_detection.entity_conditional_sparsity.test.json",
+        "2.2.special_feature_detection.entity_conditional_sparsity.train.json",
+        "2.2.special_feature_detection.id_columns.test.json",
+        "2.2.special_feature_detection.id_columns.train.json"
+      ]
+    },
+    "2.3_quality_and_integrity": {
+      "files": [
+        "2.3.missing_data_profiling.completeness_report.test.json",
+        "2.3.missing_data_profiling.completeness_report.test.png",
+        "2.3.missing_data_profiling.completeness_report.train.json",
+        "2.3.missing_data_profiling.completeness_report.train.png",
+        "2.3.potential_leakage_detection.crosstab_analysis.test.json",
+        "2.3.potential_leakage_detection.crosstab_analysis.train.json",
+        "2.3.potential_leakage_detection.post_triage_detection.test.json",
+        "2.3.potential_leakage_detection.post_triage_detection.train.json",
+        "2.3.statistical_health.data_drift.json",
+        "2.3.statistical_health.data_drift.png",
+        "2.3.structural_integrity.duplicate_detection.test.json",
+        "2.3.structural_integrity.duplicate_detection.test.png",
+        "2.3.structural_integrity.duplicate_detection.train.json",
+        "2.3.structural_integrity.duplicate_detection.train.png",
+        "2.3.structural_integrity.sentinel_detection.test.json",
+        "2.3.structural_integrity.sentinel_detection.train.json",
+        "2.3.temporal_integrity.timestamp_range.test.json",
+        "2.3.temporal_integrity.timestamp_range.train.json"
+      ]
+    },
+    "2.4_feature_inventory_and_visual_eda": {
+      "files": [
+        "2.4.feature_inventory.column_catalog.test.json",
+        "2.4.feature_inventory.column_catalog.train.json",
+        "2.4.visual_eda.categorical_distributions.test.png",
+        "2.4.visual_eda.categorical_distributions.train.png",
+        "2.4.visual_eda.target_by_category.test.png",
+        "2.4.visual_eda.target_by_category.train.png",
+        "2.4.visual_eda.temporal_overview.test.png",
+        "2.4.visual_eda.temporal_overview.train.png"
+      ]
+    }
+  }
+}

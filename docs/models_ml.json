@@ -1,0 +1,102 @@
+{
+  "modelli_machine_learning": [
+    {
+      "tipo_di_modello": "Clustering",
+      "algoritmi_inclusi": {
+        "partizionamento": [
+          "K-Means",
+          "K-Means++",
+          "Mini-Batch KM",
+          "K-Medoids (PAM)"
+        ],
+        "densita": [
+          "DBSCAN",
+          "HDBSCAN",
+          "OPTICS",
+          "Mean Shift"
+        ],
+        "gerarchico": [
+          "Ward Linkage",
+          "BIRCH",
+          "Clustering agglomerativo"
+        ],
+        "probabilistico_modello": [
+          "GMM (Gaussian Mixture Models)",
+          "LDA (Latent Dirichlet Allocation)",
+          "GMM Bayesiano"
+        ],
+        "spettrale_grafi": [
+          "Spectral Clustering",
+          "Louvain"
+        ],
+        "deep_learning": [
+          "Autoencoder",
+          "DEC / DCEC (Deep Embedded Clustering)"
+        ]
+      },
+      "ruolo_concettuale": "Apprendimento non supervisionato",
+      "problema_che_risolve": "Scoprire gruppi senza etichette"
+    },
+    {
+      "tipo_di_modello": "Classificazione",
+      "algoritmi_inclusi": {
+        "classici": [
+          "Logistic Regression",
+          "Naive Bayes",
+          "KNN (K-Nearest Neighbors)",
+          "SVM (Support Vector Machines)",
+          "Decision Tree"
+        ],
+        "moderni": [
+          "Random Forest",
+          "XGBoost",
+          "LightGBM",
+          "CatBoost",
+          "Neural Networks (MLP, CNN, Transformers)"
+        ]
+      },
+      "ruolo_concettuale": "Apprendimento supervisionato (target categorico)",
+      "problema_che_risolve": "Predire una classe"
+    },
+    {
+      "tipo_di_modello": "Regressione",
+      "algoritmi_inclusi": {
+        "classici": [
+          "Linear Regression",
+          "Ridge/Lasso/ElasticNet",
+          "Polynomial Regression",
+          "SVR (Support Vector Regression)"
+        ],
+        "moderni": [
+          "Random Forest Regressor",
+          "XGBoost Regressor",
+          "LightGBM Regressor",
+          "NGBoost",
+          "Deep Neural Networks (MLP)"
+        ]
+      },
+      "ruolo_concettuale": "Apprendimento supervisionato (target continuo)",
+      "problema_che_risolve": "Predire un valore numerico"
+    },
+    {
+      "tipo_di_modello": "Serie temporali",
+      "algoritmi_inclusi": {
+        "classici": [
+          "ARIMA",
+          "SARIMA",
+          "Exponential Smoothing (Holt-Winters)",
+          "VAR (Vector Autoregression)"
+        ],
+        "moderni": [
+          "Prophet",
+          "LSTM (Long Short-Term Memory)",
+          "GRU (Gated Recurrent Unit)",
+          "Temporal Convolutional Networks (TCN)",
+          "Time-series Transformers"
+        ]
+      },
+      "ruolo_concettuale": "Apprendimento supervisionato con dipendenza temporale",
+      "problema_che_risolve": "Predire valori nel tempo"
+    }
+  ]
+}

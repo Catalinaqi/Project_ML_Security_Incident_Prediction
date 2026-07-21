@@ -683,6 +683,9 @@ def run_step_4_4(ctx: RunContext) -> RunContext:
 # STEP 4.5 — MODEL EVALUATION
 # =============================================================================
 
+# =============================================================================
+# STEP 4.5 — MODEL EVALUATION
+# =============================================================================
 
 def run_step_4_5(ctx: RunContext) -> RunContext:
     """Execute CRISP-DM Phase 4.5 – Model Evaluation.
@@ -743,35 +746,312 @@ def run_step_4_5(ctx: RunContext) -> RunContext:
     techniques: dict[str, Any] = step_cfg.get("methods", {}).get("model_evaluation", {}).get("techniques", {})
     ari_cfg: dict[str, Any] = techniques.get("adjusted_rand_index", {})
     y_true: np.ndarray | None = None
+
     if ari_cfg.get("enabled", False):
+        # (same as before – unchanged)
+        # ... (loading ground truth logic)
         ground_truth_source: str = ari_cfg.get("params", {}).get("ground_truth_source", "")
         ground_truth_column: str = ari_cfg.get("params", {}).get("ground_truth_column", "IncidentGrade")
         encoding: dict[str, int] = ari_cfg.get("params", {}).get("encoding", {})
 
-        if ground_truth_source:
-            # Resolve path relative to run root
-            from pathlib import Path
+        if "y_true" in ctx.artifacts and ctx.artifacts["y_true"] is not None:
+            y_true = ctx.artifacts["y_true"]
+            log.info("[4.5] loaded perfectly aligned ground truth from ctx.artifacts['y_true'] (n=%d)", len(y_true))
+        elif hasattr(ctx, "df_train") and ctx.df_train is not None and ground_truth_column in ctx.df_train.columns:
+            if encoding:
+                y_true = ctx.df_train[ground_truth_column].map(encoding).values
+            else:
+                y_true = ctx.df_train[ground_truth_column].values
+            log.info("[4.5] loaded ground truth from memory Context df_train (n=%d)", len(y_true))
+        elif ground_truth_source:
             gt_path = _resolve_ground_truth_path(ctx, ground_truth_source)
             if gt_path and gt_path.exists():
-                import pandas as pd
                 df_gt = pd.read_parquet(gt_path)
-                if ground_truth_column in df_gt.columns:
-                    # Apply encoding if provided
-                    if encoding:
-                        # Map string labels to integers using encoding
-                        y_true = df_gt[ground_truth_column].map(encoding).values
-                    else:
-                        y_true = df_gt[ground_truth_column].values
-                    log.info("[4.5] loaded ground truth from %s (n=%d, source=%s)",
-                             gt_path, len(y_true), ground_truth_source)
+                n_gt = len(df_gt)
+                n_train = X_train.shape[0]
+                if n_gt != n_train:
+                    log.warning("[4.5] Dimension mismatch: df_gt (%d) vs X_train (%d). Disabling ARI.", n_gt, n_train)
+                    ari_cfg["enabled"] = False
+                    y_true = None
+                elif ground_truth_column in df_gt.columns:
+                    y_true = df_gt[ground_truth_column].map(encoding).values if encoding else df_gt[ground_truth_column].values
+                    log.info("[4.5] loaded ground truth from %s (n=%d)", gt_path, len(y_true))
                 else:
-                    log.warning("[4.5] column '%s' not found in ground truth file – skipping ARI",
-                                ground_truth_column)
+                    log.warning("[4.5] column '%s' not found – disabling ARI", ground_truth_column)
+                    ari_cfg["enabled"] = False
+                    y_true = None
             else:
-                log.warning("[4.5] ground truth file not found: %s – skipping ARI",
-                            ground_truth_source)
+                log.warning("[4.5] ground truth file not found: %s – disabling ARI", ground_truth_source)
+                ari_cfg["enabled"] = False
+                y_true = None
         else:
-            log.warning("[4.5] adjusted_rand_index enabled but no ground_truth_source configured")
+            log.warning("[4.5] adjusted_rand_index enabled but no valid ground_truth logic applied")
+            ari_cfg["enabled"] = False
+            y_true = None
+
+    # ------------------------------------------------------------------
+    # Ensure output directory exists
+    # ------------------------------------------------------------------
+    phase4_dir = ctx.run_dir / PhaseDir.PHASE4.value
+    phase4_dir.mkdir(parents=True, exist_ok=True)
+    log.debug("[4.5] output directory: %s", phase4_dir)
+
+    # ------------------------------------------------------------------
+    # Call pure evaluation function
+    # ------------------------------------------------------------------
+    log.debug("[4.5] techniques config keys: %s", list(techniques.keys()))
+    try:
+        evaluation_results: dict = evaluate_all_models(
+            techniques=techniques,
+            X_train=X_train,
+            cluster_labels=cluster_labels,
+            best_models=best_models or {},
+            y_true=y_true,
+            global_seed=global_seed,
+        )
+    except Exception as e:
+        log.error("[4.5] evaluate_all_models failed: %s", e)
+        raise
+
+    log.info("[4.5] evaluation completed – %d technique(s) processed",
+             len(evaluation_results) - 2)  # exclude consolidated keys
+
+    # ------------------------------------------------------------------
+    # Persist per‑technique outputs (individual JSON files)
+    # ------------------------------------------------------------------
+    for technique_name, technique_cfg in techniques.items():
+        if not technique_cfg.get("enabled", False):
+            continue
+        targets: list[str] = technique_cfg.get("targets", [])
+        output_config: dict = technique_cfg.get("output", {})
+        technique_results: dict = evaluation_results.get(technique_name, {})
+
+        for target in targets:
+            output_path: str = output_config.get(target, "")
+            if output_path and target in technique_results:
+                save_json(technique_results[target], phase4_dir / output_path)
+                log.info("[4.5] saved '%s' for '%s' → %s", technique_name, target, output_path)
+            elif not output_path:
+                log.debug("[4.5] no output path for technique '%s', target '%s'", technique_name, target)
+
+    # ------------------------------------------------------------------
+    # Persist output_artifacts (consolidated files)
+    # ------------------------------------------------------------------
+    output_artifacts: dict[str, str] = step_cfg.get("output_artifacts", {})
+
+    # ------------------------------------------------------------------
+    # 🆕 Generate full cluster labels (198k rows) using best_models on X_train
+    # ------------------------------------------------------------------
+    cluster_labels_path: str = output_artifacts.get("cluster_labels", "")
+    if cluster_labels_path:
+        if best_models and X_train is not None:
+            log.info("[4.5] Generating full cluster labels on %d rows using %d model(s)",
+                     X_train.shape[0], len(best_models))
+
+            # full_predictions = {}
+            # for model_name, model in best_models.items():
+            #     # model.predict returns an array of cluster assignments
+            #     full_predictions[model_name] = model.predict(X_train)
+            # df_full = pd.DataFrame(full_predictions)
+
+
+            full_predictions = {}
+            for model_name, model in best_models.items():
+                if hasattr(model, "predict"):
+                    # Para algoritmos como KMeans
+                    full_predictions[model_name] = model.predict(X_train)
+                elif hasattr(model, "labels_"):
+                    # Para algoritmos como DBSCAN (ya entrenados en X_train)
+                    full_predictions[model_name] = model.labels_
+                else:
+                    # Fallback de seguridad
+                    full_predictions[model_name] = model.fit_predict(X_train)
+
+            df_full = pd.DataFrame(full_predictions)
+            # Al pasar index=X_train.index preservamos los identificadores exactos de las filas entrenadas
+            #df_full = pd.DataFrame(full_predictions, index=X_train.index)
+
+            df_full.to_parquet(phase4_dir / cluster_labels_path, index=False)
+            log.info("[4.5] Saved full cluster labels → %s (shape=%s)",
+                     cluster_labels_path, df_full.shape)
+            # Also store in context for possible use in phase 5
+            ctx.artifacts["full_cluster_labels_df"] = df_full
+        else:
+            log.warning("[4.5] Cannot generate full cluster labels – best_models or X_train is None")
+            # Fallback: copy sample labels (30k) – only if cluster_labels exists
+            if cluster_labels:
+                df_labels = pd.DataFrame(cluster_labels)
+                df_labels.to_parquet(phase4_dir / cluster_labels_path, index=False)
+                log.warning("[4.5] Saved SAMPLE cluster labels (30k) as fallback to %s", cluster_labels_path)
+    else:
+        log.debug("[4.5] No 'cluster_labels' path in output_artifacts")
+
+    # summary_comparison.json
+    summary_path: str = output_artifacts.get("summary_comparison", "")
+    if summary_path and "consolidated_summary" in evaluation_results:
+        save_json(evaluation_results["consolidated_summary"], phase4_dir / summary_path)
+        log.info("[4.5] saved summary comparison → %s", summary_path)
+
+    # consolidated_ari.json – only if ARI was computed
+    ari_path: str = output_artifacts.get("consolidated_ari", "")
+    if ari_path and "adjusted_rand_index" in evaluation_results:
+        save_json(evaluation_results["adjusted_rand_index"], phase4_dir / ari_path)
+        log.info("[4.5] saved consolidated ARI → %s", ari_path)
+
+    # consolidated_profiling.json
+    profiling_path: str = output_artifacts.get("consolidated_profiling", "")
+    if profiling_path and "consolidated_profiling" in evaluation_results:
+        save_json(evaluation_results["consolidated_profiling"], phase4_dir / profiling_path)
+        log.info("[4.5] saved consolidated profiling → %s", profiling_path)
+
+    # ------------------------------------------------------------------
+    # Save cluster subsets from evaluation_results (if any)
+    # ------------------------------------------------------------------
+    cluster_subsets: dict[str, pd.DataFrame] = evaluation_results.get("cluster_subsets", {})
+    if cluster_subsets:
+        for target, df_subset in cluster_subsets.items():
+            suffix = target.replace("kmeans_", "")
+            subset_key = f"cluster_subsets_{suffix}"
+            subset_path: str = output_artifacts.get(subset_key, "")
+            if subset_path and df_subset is not None:
+                df_subset.to_parquet(phase4_dir / subset_path, index=False)
+                log.info("[4.5] saved cluster subset for '%s' → %s (shape=%s)",
+                         target, subset_path, df_subset.shape)
+            elif not subset_path:
+                log.debug("[4.5] no output path for cluster subset '%s'", target)
+
+    # ------------------------------------------------------------------
+    # Store in context artifacts for downstream steps (Phase 5)
+    # ------------------------------------------------------------------
+    ctx.artifacts["evaluation_results"] = evaluation_results
+    ctx.artifacts["cluster_labels_final"] = cluster_labels  # preserve sample labels too
+
+    # Write output artifacts for registry
+    write_output_artifacts(
+        ctx,
+        step_key=step_key,
+        step_cfg=step_cfg,
+        df_train=None,
+        df_test=None,
+        extra={
+            "techniques_evaluated": [k for k, v in techniques.items() if v.get("enabled")],
+            "models_evaluated": list(cluster_labels.keys()),
+            "has_ground_truth": y_true is not None,
+            "global_seed_used": global_seed,
+        },
+    )
+
+    log.info("[4.5] done – evaluation completed successfully")
+    return ctx
+
+
+
+def run_step_4_5_old(ctx: RunContext) -> RunContext:
+    """Execute CRISP-DM Phase 4.5 – Model Evaluation.
+
+    Computes evaluation metrics (silhouette, davies_bouldin, calinski_harabasz,
+    adjusted_rand_index, cluster_profiling) on trained clustering models.
+
+    Parameters
+    ----------
+    ctx : RunContext
+        Run context with ``config`` containing
+        ``phase4_data_modeling.steps.step_4_5_model_evaluation``.
+        Requires ``ctx.artifacts["X_train"]``, ``ctx.artifacts["cluster_labels"]``,
+        ``ctx.artifacts["best_models"]``.
+
+    Returns
+    -------
+    RunContext
+        Same ``ctx`` enriched with evaluation results in artifacts.
+    """
+    step_key = StepsPhase.STEP_4_5.value
+    step_cfg: dict[str, Any] = dget(
+        ctx.config.phases.phase4_data_modeling.steps, step_key, {}
+    )
+    if not enabled(step_cfg, default=True):
+        log.info("[4.5] step disabled – skipping")
+        return ctx
+
+    log.info("[4.5] start – run_id=%s", ctx.run_id)
+
+    # ------------------------------------------------------------------
+    # Validate required input data
+    # ------------------------------------------------------------------
+    X_train = ctx.artifacts.get("X_train")
+    cluster_labels = ctx.artifacts.get("cluster_labels")
+    best_models = ctx.artifacts.get("best_models")
+
+    if X_train is None:
+        log.error("[4.5] X_train not found in ctx.artifacts – aborting")
+        raise RuntimeError("[4.5] Missing X_train")
+    if cluster_labels is None:
+        log.error("[4.5] cluster_labels not found in ctx.artifacts – aborting")
+        raise RuntimeError("[4.5] Missing cluster_labels")
+    if best_models is None:
+        log.warning("[4.5] best_models not found – profiling may be limited")
+
+    log.info("[4.5] input shape=%s, models=%s", X_train.shape, list(cluster_labels.keys()))
+
+    # ------------------------------------------------------------------
+    # Extract global random seed (inherited from base_pipeline_config)
+    # ------------------------------------------------------------------
+    global_seed = dget(ctx.config.runtime, "random_seed", 7)
+    log.debug("[4.5] global random_seed=%d", global_seed)
+
+    # ------------------------------------------------------------------
+    # Load ground truth labels if adjusted_rand_index is enabled
+    # ------------------------------------------------------------------
+    techniques: dict[str, Any] = step_cfg.get("methods", {}).get("model_evaluation", {}).get("techniques", {})
+    ari_cfg: dict[str, Any] = techniques.get("adjusted_rand_index", {})
+    y_true: np.ndarray | None = None
+
+    if ari_cfg.get("enabled", False):
+        # 1. Definisci PRIMA le variabili di configurazione (evita UnboundLocalError)
+        ground_truth_source: str = ari_cfg.get("params", {}).get("ground_truth_source", "")
+        ground_truth_column: str = ari_cfg.get("params", {}).get("ground_truth_column", "IncidentGrade")
+        encoding: dict[str, int] = ari_cfg.get("params", {}).get("encoding", {})
+
+        # 2. Priorità 1: Lettura da memoria perfettamente allineata (Generata da main.py)
+        if "y_true" in ctx.artifacts and ctx.artifacts["y_true"] is not None:
+            y_true = ctx.artifacts["y_true"]
+            log.info("[4.5] loaded perfectly aligned ground truth from ctx.artifacts['y_true'] (n=%d)", len(y_true))
+
+        # 3. Prioridad 2: Fallback desde df_train (Si df_train tiene la columna original)
+        elif hasattr(ctx, "df_train") and ctx.df_train is not None and ground_truth_column in ctx.df_train.columns:
+            if encoding:
+                y_true = ctx.df_train[ground_truth_column].map(encoding).values
+            else:
+                y_true = ctx.df_train[ground_truth_column].values
+            log.info("[4.5] loaded ground truth from memory Context df_train (n=%d)", len(y_true))
+
+        # 4. Priorità 3: Caricamento classico da disco (opzione di ripiego originale)
+        elif ground_truth_source:
+            gt_path = _resolve_ground_truth_path(ctx, ground_truth_source)
+            if gt_path and gt_path.exists():
+                df_gt = pd.read_parquet(gt_path)
+                n_gt = len(df_gt)
+                n_train = X_train.shape[0]
+
+                if n_gt != n_train:
+                    log.warning("[4.5] Dimension mismatch: df_gt (%d) vs X_train (%d). Disabling ARI.", n_gt, n_train)
+                    ari_cfg["enabled"] = False
+                    y_true = None
+                elif ground_truth_column in df_gt.columns:
+                    y_true = df_gt[ground_truth_column].map(encoding).values if encoding else df_gt[ground_truth_column].values
+                    log.info("[4.5] loaded ground truth from %s (n=%d)", gt_path, len(y_true))
+                else:
+                    log.warning("[4.5] column '%s' not found – disabling ARI", ground_truth_column)
+                    ari_cfg["enabled"] = False
+                    y_true = None
+            else:
+                log.warning("[4.5] ground truth file not found: %s – disabling ARI", ground_truth_source)
+                ari_cfg["enabled"] = False
+                y_true = None
+        else:
+            log.warning("[4.5] adjusted_rand_index enabled but no valid ground_truth logic applied")
+            ari_cfg["enabled"] = False
+            y_true = None
 
     # ------------------------------------------------------------------
     # Ensure output directory exists
@@ -848,52 +1128,33 @@ def run_step_4_5(ctx: RunContext) -> RunContext:
         save_json(evaluation_results["consolidated_profiling"], phase4_dir / profiling_path)
         log.info("[4.5] saved consolidated profiling → %s", profiling_path)
 
-    # ------------------------------------------------------------------
-    # Handle cluster_profiling export of cluster subsets (if enabled)
-    # ------------------------------------------------------------------
-    cluster_profiling_cfg: dict[str, Any] = techniques.get("cluster_profiling", {})
-    if cluster_profiling_cfg.get("enabled", False):
-        profiling_params: dict = cluster_profiling_cfg.get("params", {})
-        export_subsets: bool = profiling_params.get("export_cluster_subsets", False)
-        if export_subsets:
-            subset_sample_size: int = profiling_params.get("subset_sample_size", 5000)
-            subset_format: str = profiling_params.get("subset_format", "parquet")
-            targets_profiling: list[str] = cluster_profiling_cfg.get("targets", [])
-
-            for target in targets_profiling:
-                labels = cluster_labels.get(target)
-                if labels is None:
-                    continue
-                unique_labels = np.unique(labels)
-                subsets = {}
-                for cluster_id in unique_labels:
-                    mask = labels == cluster_id
-                    cluster_X = X_train[mask]
-                    # Subsample if needed
-                    if cluster_X.shape[0] > subset_sample_size:
-                        rng = np.random.RandomState(global_seed)
-                        idx = rng.choice(cluster_X.shape[0], subset_sample_size, replace=False)
-                        cluster_X_sub = cluster_X[idx]
-                    else:
-                        cluster_X_sub = cluster_X
-                    subsets[int(cluster_id)] = cluster_X_sub.tolist()  # or save as separate files
-
-                # Save as JSON (or Parquet if you want, but JSON is simpler for inspection)
-                subset_output_key = f"cluster_subsets_{target}"
-                subset_path: str = output_artifacts.get(subset_output_key, "")
-                if subset_path:
-                    save_json(subsets, phase4_dir / subset_path)
-                    log.info("[4.5] saved cluster subset for '%s' → %s", target, subset_path)
 
     # ------------------------------------------------------------------
+    # Save cluster subsets from evaluation_results (if any)
+    # ------------------------------------------------------------------
+    cluster_subsets: dict[str, pd.DataFrame] = evaluation_results.get("cluster_subsets", {})
+    if cluster_subsets:
+        for target, df_subset in cluster_subsets.items():
+            # Derivar clave de output_artifacts desde el target
+            # "kmeans_n2" → "cluster_subsets_n2"
+            suffix = target.replace("kmeans_", "")
+            subset_key = f"cluster_subsets_{suffix}"
+            subset_path: str = output_artifacts.get(subset_key, "")
+            if subset_path and df_subset is not None:
+                df_subset.to_parquet(phase4_dir / subset_path, index=False)
+                log.info("[4.5] saved cluster subset for '%s' → %s (shape=%s)",
+                         target, subset_path, df_subset.shape)
+            elif not subset_path:
+                log.debug("[4.5] no output path for cluster subset '%s'", target)
+
+    # ==================================================================
+    # 🛠️ FIX: ESTE BLOQUE AHORA ESTÁ FUERA DEL "if cluster_subsets:"
+    # ==================================================================
     # Store in context artifacts for downstream steps (Phase 5)
-    # ------------------------------------------------------------------
     ctx.artifacts["evaluation_results"] = evaluation_results
     ctx.artifacts["cluster_labels_final"] = cluster_labels  # preserve
 
-    # ------------------------------------------------------------------
     # Write output artifacts for registry
-    # ------------------------------------------------------------------
     write_output_artifacts(
         ctx,
         step_key=step_key,
@@ -911,34 +1172,12 @@ def run_step_4_5(ctx: RunContext) -> RunContext:
     log.info("[4.5] done – evaluation completed successfully")
     return ctx
 
-
 # ---------------------------------------------------------------------------
 # Helper: resolve ground truth file path (relative to run root)
 # ---------------------------------------------------------------------------
 
-
 def _resolve_ground_truth_path(ctx: RunContext, relative_path: str) -> Path | None:
-    """Resolve ``ground_truth_source`` relative path to an absolute file path.
-
-    Tries:
-    1. Directly under the run root (``ctx.run_dir``).
-    2. Under the phase3 output directory (if exists).
-    3. Under the phase4 directory (for cases where path references earlier phase).
-
-    Parameters
-    ----------
-    ctx : RunContext
-        Current run context.
-    relative_path : str
-        Relative path as configured in YAML (e.g., ``"3.5.dataset_formatting.save_auxiliary_labels.c_incident_grade_labels_train.parquet"``).
-
-    Returns
-    -------
-    Path or None
-        Resolved absolute path, or ``None`` if not found.
-    """
-    from pathlib import Path
-
+    """Resolve ``ground_truth_source`` relative path …"""
     run_root = ctx.run_dir
     candidates = [
         run_root / relative_path,
@@ -946,10 +1185,14 @@ def _resolve_ground_truth_path(ctx: RunContext, relative_path: str) -> Path | No
         run_root / PhaseDir.PHASE4.value / relative_path,
     ]
 
+    log.debug("[_resolve_ground_truth_path] searching for '%s'", relative_path)
     for candidate in candidates:
-        if candidate.exists():
-            log.debug("[_resolve_ground_truth_path] found at %s", candidate)
-            return candidate.resolve()
+        exists = candidate.exists()
+        log.debug("[_resolve_ground_truth_path]  candidate=%s  exists=%s", candidate, exists)
+        if exists:
+            resolved = candidate.resolve()
+            log.info("[_resolve_ground_truth_path] found at %s", resolved)
+            return resolved
 
     log.warning("[_resolve_ground_truth_path] file not found in any candidate path: %s", relative_path)
     return None

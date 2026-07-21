@@ -1,0 +1,52 @@
+{
+  "project": "phase3_data_preparation",
+  "pipeline_stages": {
+    "3.1_data_selection": {
+      "files": [
+        "3.1.data_selection.final_features.json",
+        "3.1.data_selection.overview.png",
+        "3.1.dataset_definition.drop_technical_columns.json",
+        "3.1.dataset_definition.manual_include_exclude.json",
+        "3.1.feature_selection.remove_constant_features.json",
+        "3.1.feature_selection.remove_duplicate_features.json",
+        "3.1.sentinel_removal.bigint_cleanup.json"
+      ]
+    },
+    "3.2_data_cleaning": {
+      "files": [
+        "3.2.categorical_noise.rare_grouping.json",
+        "3.2.categorical_noise.sentinel_cleanup.json",
+        "3.2.data_cleaning.cleaning_report.json",
+        "3.2.duplicate_handling.exact_duplicates.removed.json",
+        "3.2.missing_data_handling.median_imputation.values.json",
+        "3.2.missing_data_handling.mode_imputation.values.json"
+      ]
+    },
+    "3.3_data_transformation": {
+      "files": [
+        "3.3.column_dropping.dropped_columns.json",
+        "3.3.encoding.ordinal_encoding.mappings.json",
+        "3.3.feature_engineering.groupby_aggregations.stats.json",
+        "3.3.feature_scaling.frequency_encoding.dictionary.json",
+        "3.3.missing_flags.passthrough.json",
+        "3.3.numeric_scaling.standard_scaling.statistics.json",
+        "3.3.temporal_features.datetime_extraction.distribution.png",
+        "3.3.data_transformation.final_feature_schema.json",
+        "3.3.data_transformation.hour_distribution.json",
+        "3.3.data_transformation.transformation_report.json"
+      ]
+    },
+    "3.5_dataset_formatting": {
+      "files": [
+        "3.5.data_formatting.a_train_prepared.parquet",
+        "3.5.data_formatting.f_final_schema_report.json",
+        "3.5.data_formatting.g_serialization_log.json",
+        "3.5.data_split.no_split_clustering.json",
+        "3.5.dataset_formatting.array_conversion.json",
+        "3.5.dataset_formatting.save_auxiliary_labels.c_incident_grade_labels_train.parquet",
+        "3.5.dataset_formatting.save_auxiliary_labels.report.json",
+        "3.5.dataset_formatting.type_casting.json"
+      ]
+    }
+  }
+}

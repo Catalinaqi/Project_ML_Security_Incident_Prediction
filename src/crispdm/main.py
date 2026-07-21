@@ -78,7 +78,7 @@ from crispdm.configuration.enum_registry_config import PhaseDir
 from crispdm.common.path_service_common import find_project_root
 from crispdm.common.context_facade_common import RunContext
 from crispdm.configuration.yml_repository_config import YmlRepository
-from crispdm.common.logging_adapter_common import get_logger
+from crispdm.common.logging_adapter_common import get_logger,config_run_logging
 
 # Import dei Runner ufficiali estratti dagli script delle singole fases
 from crispdm.api.execution_facade_api import (
@@ -282,35 +282,56 @@ def main():
     project_root = find_project_root()
     base_runs_dir = project_root / "outputs" / "runs" / args.pipeline / args.dataset_key
 
-    log.info("=" * 80)
-    log.info(f"🏁 CRISP-DM MASTER PIPELINE ORCHESTRATOR — MODALITÀ SELEZIONATA: {args.phase.upper()}")
-    log.info("=" * 80)
-
-    # 1. Caricamento iniziale della configurazione YAML
+    # 1. Caricamento della configurazione YAML
     try:
         cfg = YmlRepository.load_pipeline_config(args.pipeline)
-
-        # Estrazione del limite massimo di righe per l'addestramento per prevenire l'esaurimento della RAM
         limit = cfg.phases.phase4_data_modeling.steps \
             .step_4_3_model_training.methods.model_training \
             .techniques.fit.params.get("max_training_rows", 30000)
+
+        try:
+            log_level = cfg.runtime.log_level
+        except (AttributeError, KeyError):
+            log_level = "INFO"
     except Exception as e:
-        log.error(f"❌ Errore critico durante il setup iniziale della configurazione: {e}")
+        print(f"❌ Errore critico durante il setup iniziale della configurazione: {e}")
         sys.exit(1)
 
-    # 2. Instradamento dei flussi di esecuzione in base al parametro --phase passato
+    # 2. Instradamento e Logging Dinamico
     try:
+        # =========================================================================
+        # CASO A: FASE 2 o ALL (Creano un nuovo Run ID)
+        # =========================================================================
         if args.phase in ["all", "2"]:
-            # La Fase 2 avvia l'orchestrazione creando la cartella fisica con il nuovo ID univoco
+            # Usiamo print() perché execute_phase2 avvierà il suo logger ufficiale internamente
+            print("=" * 80)
+            print(f"🏁 CRISP-DM MASTER PIPELINE ORCHESTRATOR — MODALITÀ: {args.phase.upper()}")
+            print("=" * 80)
+
             ctx = execute_phase2(args.pipeline, args.dataset_key)
             if args.phase == "all":
                 ctx = execute_phase3(ctx)
                 ctx = execute_phase4(ctx, limit)
                 ctx = execute_phase5(ctx, limit)
+
+        # =========================================================================
+        # CASO B: FASI 3, 4 o 5 (Usano il Run ID esistente)
+        # =========================================================================
         else:
-            # Le fasi isolate (3, 4, 5) ereditano dinamicamente l'ultimo run modificato sul disco
             run_dir = find_latest_run_dir(base_runs_dir, args.run_id)
-            log.info(f"📁 Collegamento stabilito alla directory del Run esistente: {run_dir.name}")
+
+            # ORA inizializziamo il logger, perché conosciamo il run_dir esatto
+            # run_name = f"run_{args.pipeline}_{args.dataset_key}_phase{args.phase}_{run_dir.name}"
+
+            # Il modulo config_run_logging aggiunge già un timestamp automaticamente.
+            # Passiamo un nome breve (senza run_dir.name) per evitare la duplicazione.
+            run_name = f"phase_{args.phase}_{args.pipeline}"
+            config_run_logging(output_root=project_root / "outputs", log_level=log_level, run_name=run_name)
+
+            log.info("=" * 80)
+            log.info(f"🏁 CRISP-DM MASTER PIPELINE ORCHESTRATOR — MODALITÀ: {args.phase.upper()}")
+            log.info(f"📁 Collegamento stabilito al Run esistente: {run_dir.name}")
+            log.info("=" * 80)
 
             ctx = RunContext(
                 config=cfg, run_dir=run_dir, df_train=None, df_test=None,
@@ -325,12 +346,13 @@ def main():
                 ctx = execute_phase5(ctx, limit)
 
     except Exception as e:
-        log.error(f"\n❌ CRASH CRITICO RILEVATO DURANTE L'ORCHESTRAZIONE: {e}", exc_info=True)
+        print(f"\n❌ CRASH CRITICO RILEVATO DURANTE L'ORCHESTRAZIONE: {e}")
         sys.exit(1)
 
-    log.info("\n" + "=" * 80)
-    log.info("🎉 PIPELINE ELABORATA CON SUCCESSO RISPETTANDO LO STANDARD CRISP-DM!")
-    log.info("=" * 80)
+    # 3. Chiusura globale
+    print("\n" + "=" * 80)
+    print("🎉 PIPELINE ELABORATA CON SUCCESSO RISPETTANDO LO STANDARD CRISP-DM!")
+    print("=" * 80)
 
 
 if __name__ == "__main__":

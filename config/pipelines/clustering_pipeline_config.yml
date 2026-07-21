@@ -34,7 +34,7 @@ clustering_pipeline_config:
   # RUNTIME (Override base if needed)
   # ────────────────────────────────────────────────────────────────────────────
   runtime:
-    # Hereda de base, override solo si necesario
+    # Inherit from base, override only if necessary.
     # random_seed: 7
     # output_root: "outputs"
     # overwrite_artifacts: true
@@ -44,7 +44,7 @@ clustering_pipeline_config:
   # PROFILES (Hereda de base)
   # ────────────────────────────────────────────────────────────────────────────
   # dev: 50k rows, prod: 200k rows
-  # Stratify en IncidentGrade aunque clustering no lo use como target
+  # Stratify by IncidentGrade even though clustering does not use it as a target
 
 
   phases:
@@ -71,11 +71,11 @@ clustering_pipeline_config:
       objective: "Transform raw data into modeling-ready features. 
                   Fit on train, transform on test."
 
-      # QUESTION: ¿Combinar train+test para drift detection o mantener separados?
+      # QUESTION: Should I combine train and test for drift detection or keep them separate?
       read_strategy:
-        mode: "sample"  # Hereda de profile activo
-        combine_before_sampling: false  # TODO: Decide
-        add_source_column: false  # true si necesitas diferenciar train/test después
+        mode: "sample"
+        combine_before_sampling: false
+        add_source_column: false
         input_source: "${phases.phase2_data_understanding.steps.step_2_1_data_acquisition.output_artifacts.sample_train_parquet}"
         #input_source: "phase2_train"  # Lee de outputs de Phase 2
 
@@ -103,12 +103,12 @@ clustering_pipeline_config:
                       NetworkMessageId: 530000
                       FileName: 290000
                       Sha256: 139000
-                      AlertTitle: 10000      # ← NUEVO: confirmado bigint_hashed en fase 2
+                      AlertTitle: 10000
                     actions:
                       create_binary_flags: true
                       nullify_above_threshold: true
                       keep_real_values: true
-                      include_real_in_output: true   # ← NUEVO: garantiza que _real llegue a final_features
+                      include_real_in_output: true
                   output: "3.1.sentinel_removal.bigint_cleanup.json"
 
             dataset_definition:
@@ -134,12 +134,12 @@ clustering_pipeline_config:
                       - "MitreTechniques"        # multi-value, 57% missing, sin explotar
                       - "ThreatFamily"           # leakage confirmado fase 2
                       - "Usage"                  # add because find F2
-                    keep_for_aggregation: # ← NUEVO: protegidos hasta post-aggregation en 3.3
+                    keep_for_aggregation: # ← : protegidos hasta post-aggregation en 3.3
                       - "IncidentId"             # clave groupby en 3.3
                       - "AlertId"                # para n_alerts_per_incident en 3.3
                       - "EntityType"             # para n_unique_entity_types en 3.3
                       - "IncidentGrade" # retenida para stratified shuffle en 3.5, dropeada ANTES de array_conversion
-                    leakage_risk_flag: # ← NUEVO: confirmado suspect_leakage en fase 2
+                    leakage_risk_flag: # ← : confirmado suspect_leakage en fase 2
                       - "SuspicionLevel"
                       - "LastVerdict"
                   output: "3.1.dataset_definition.drop_technical_columns.json"
@@ -176,7 +176,7 @@ clustering_pipeline_config:
                   enabled: true
                   params:
                     numeric_only: true
-                    exclude_columns:          # ← NUEVO: excluir BIGINTs explícitamente
+                    exclude_columns:          # ← : excluir BIGINTs explícitamente
                       - "AccountUpn"          # BIGINT — sin valores reales separados
                       - "IpAddress"           # BIGINT
                       - "DeviceId"            # BIGINT
@@ -193,11 +193,11 @@ clustering_pipeline_config:
                       - "OAuthApplicationId"  # pseudo-categórico
                   output: "3.2.missing_data_handling.median_imputation.values.json"
                   notes: >
-                    Con 3.1 corregido, no existen columnas _real separadas.
-                    BIGINTs originales excluidos explícitamente — imputar un ID
-                    con mediana no tiene sentido semántico. Si no quedan columnas
-                    numéricas continuas con missing, este paso no imputa nada
-                    y lo registra en el output.
+                    Con la 3.1 corretta, non esistono colonne _real separate. 
+                    I BIGINT originali sono esplicitamente esclusi: imputare un 
+                    ID con la mediana non ha senso semantico. Se non rimangono colonne
+                    numeriche continue con valori mancanti, questo passaggio non 
+                    imputa nulla e lo registra nell'output.
 
                 mode_imputation:
                   enabled: true
@@ -208,21 +208,20 @@ clustering_pipeline_config:
                     - "SuspicionLevel_is_missing"
                   output: "3.2.missing_data_handling.mode_imputation.values.json"
                   notes: >
-                    SuspicionLevel: 84.88% missing, solo 2 valores → no imputar,
-                    crear flag. LastVerdict: imputar con moda (Suspicious) + flag.
+                    SuspicionLevel: 84,88% di missing, solo 2 valori → non imputare, 
+                    creare flag. LastVerdict: imputare con la moda (Suspicious) + flag.
 
             outlier_handling:
               enabled: false
               notes: >
-                Sin columnas continuas reales en este step. IQR clipping
-                se aplica en 3.3 post-feature engineering sobre
-                n_evidences_per_incident, n_alerts_per_incident,
-                n_unique_entity_types y Timestamp_hour.
+                Nessuna colonna continua reale in questo step. L'IQR clipping viene 
+                applicato nel 3.3 post-feature engineering su n_evidences_per_incident, 
+                n_alerts_per_incident, n_unique_entity_types e Timestamp_hour.
 
             robust_transformations:
               enabled: false
               notes: >
-                Sin variables continuas que requieran transformación en este step.
+                Nessuna variabile continua che richieda trasformazione in questo step.
 
             categorical_noise:
               enabled: true
@@ -240,14 +239,14 @@ clustering_pipeline_config:
                         replace_with: null
                   output: "3.2.categorical_noise.sentinel_cleanup.json"
                   notes: >
-                    OSFamily==0 (~3,826 filas) es sentinel. Se nullifica
-                    antes de rare_grouping.
+                    OSFamily==0 (~3.826 righe) è sentinel. Si annulla 
+                    (nullify) prima del rare_grouping.
                 rare_grouping:
                   enabled: true
                   params:
                     min_freq: 0.001
                     unseen_category: "OTHER"
-                    exclude_columns:          # ← NUEVO: excluir BIGINTs nullificados
+                    exclude_columns:          # ← excluir BIGINTs nullificados
                       - "Url"                 # nullificado en 3.1, no es categórico string
                       - "AlertTitle"          # nullificado en 3.1, no es categórico string
                       - "Url_is_missing"      # binaria, no categórica
@@ -283,7 +282,7 @@ clustering_pipeline_config:
           enabled: true
           methods:
 
-            # 1. Feature engineering — PRIMERO para crear columnas antes de escalar
+            # 1. Feature engineering — PRIMA per creare le colonne prima di procedere con lo scaling.
             feature_engineering:
               enabled: true
               techniques:
@@ -303,7 +302,7 @@ clustering_pipeline_config:
                         method: "nunique"
                   output: "3.3.feature_engineering.groupby_aggregations.stats.json"
 
-            # 2. Temporal — ANTES de numeric_scaling para que Timestamp_hour exista
+            # 2. Temporale — PRIMA del numeric_scaling affinché Timestamp_hour esista.
             temporal_features:
               enabled: true
               techniques:
@@ -316,7 +315,7 @@ clustering_pipeline_config:
                     drop_original: true
                   output: "3.3.temporal_features.datetime_extraction.distribution.png"
 
-            # 3. Numeric scaling — engineeradas + Timestamp_hour juntas
+            # 3. Numeric scaling — feature ingegnerizzate + Timestamp_hour insieme.
             numeric_scaling:
               enabled: true
               techniques:
@@ -331,7 +330,7 @@ clustering_pipeline_config:
                   fit_on: "train"
                   output: "3.3.numeric_scaling.standard_scaling.statistics.json"
 
-            # 4. Frequency encoding — cardinalidad alta, fit en train
+            # 4. Frequency encoding — alta cardinalità, fit sul train.
             feature_scaling:
               enabled: true
               techniques:
@@ -352,7 +351,7 @@ clustering_pipeline_config:
                     fit_on: "train"
                   output: "3.3.feature_scaling.frequency_encoding.dictionary.json"
 
-            # 5. Ordinal encoding — orden semántico explícito
+            # 5. Ordinal encoding — ordine semantico esplicito.
             encoding:
               enabled: true
               techniques:
@@ -375,7 +374,7 @@ clustering_pipeline_config:
                 frequency_encoding:
                   enabled: false
 
-            # 6. Column dropping — post-aggregation y sin señal
+            # 6. Column dropping — post-aggregazione e senza segnale
             column_dropping:
               enabled: true
               techniques:
@@ -391,7 +390,7 @@ clustering_pipeline_config:
                     reason: "identifier_or_redundant_post_aggregation"
                   output: "3.3.column_dropping.dropped_columns.json"
 
-            # 7. Missing flags — señal binaria para clustering
+            # 7. Missing flags — segnale binario per il clustering
             missing_flags:
               enabled: true
               techniques:
@@ -569,7 +568,7 @@ clustering_pipeline_config:
             # --- EL CEREBRO DEL PIPELINE ---
             transformers_pipeline: "3.5.data_formatting.e_transformers_pipeline.pkl"
 
-            # NUEVO: Solo labels + ID para alineación (no features)
+            # Solo labels + ID para alineación (no features)
             #auxiliary_labels_train: "3.5.data_formatting.auxiliary_labels_train.parquet"
 
             # --- METADATOS ---
@@ -602,16 +601,32 @@ clustering_pipeline_config:
           methods:
             algorithm_selection:
               techniques:
+                # --- Partizionamento ---
                 kmeans:
                   enabled: true
                   priority: 1
                   output: "4.1.algorithm_selection.kmeans.json"
+
+                # --- Densità ---
                 dbscan:
                   enabled: true
                   priority: 2
                   output: "4.1.algorithm_selection.dbscan.json"
+
+                hdbscan:          # moderno -> densità variabile, non richiede epsilon
+                  enabled: false
+
+                # --- Partizionamento (inizializzazione migliorata) ---
+                kmeans++:         # moderno -> # variante di kmeans, convergenza migliore
+                  enabled: false
+
+                # --- Probabilistico ---
+                gmm:              # Gaussian Mixture Models
+                  enabled: false
+
           output_artifacts:
-            algorithms_selected: "4.1.algorithm_selection.summary.json"  # ya existe implícito en kmeans+dbscan json
+            algorithms_selected: "4.1.algorithm_selection.summary.json"
+
         step_4_2_pretrain_analysis:
           enabled: true
           description: "k-NN distance analysis para eps de DBSCAN"
@@ -668,7 +683,7 @@ clustering_pipeline_config:
                     scoring: "silhouette"  # TODO: silhouette, davies_bouldin, calinski
                     refit: true
 
-                    # NUEVO — subsample solo para grid search, fit final sobre datos completos
+                    # subsample solo para grid search, fit final sobre datos completos
                     grid_search_sample_size: 15000  # Bajalo de 30k a 15k
                     metrics_sample_size: 5000       # Bajalo de 10k a 5k
                     random_state: 7
@@ -691,6 +706,7 @@ clustering_pipeline_config:
             model_card: "4.3.model_training.model_card.json"
             validation_metrics: "4.3.model_training.validation_metrics.json"
             cluster_assignments_sample: "4.3.model_training.cluster_assignments_sample.parquet"
+#            cluster_labels: "4.5.model_evaluation.cluster_labels.parquet"  # 198k (new)
             cluster_centroids: "4.3.model_training.cluster_centroids.parquet"
             cluster_sizes: "4.3.model_training.cluster_sizes.json"
             hp_search_summary: "4.3.model_training.hp_search_summary.json"
@@ -781,7 +797,7 @@ clustering_pipeline_config:
                     export_cluster_subsets: true        # NUEVO
                     subset_sample_size: 5000            # filas por cluster exportadas
                     subset_format: "parquet"
-                    # NUEVO: top_features — las 10 features más discriminantes por cluster, crítico para fase 5
+                    # top_features — las 10 features más discriminantes por cluster, crítico para fase 5
                   output:
                     kmeans_n2: "4.5.model_evaluation.profiling.kmeans_n2.json"
                     kmeans_n3: "4.5.model_evaluation.profiling.kmeans_n3.json"
@@ -820,7 +836,8 @@ clustering_pipeline_config:
       read_strategy:
         train_features: "3.5.data_formatting.a_train_prepared.parquet"
         train_labels: "3.5.dataset_formatting.save_auxiliary_labels.c_incident_grade_labels_train.parquet"
-        cluster_assignments: "4.3.model_training.cluster_assignments_sample.parquet"
+        #cluster_assignments: "4.3.model_training.cluster_assignments_sample.parquet"
+        cluster_assignments: "4.5.model_evaluation.cluster_labels.parquet"
         best_models: "4.3.model_training.best_model.pkl"
         profiling_n2: "4.5.model_evaluation.profiling.kmeans_n2.json"
         profiling_n3: "4.5.model_evaluation.profiling.kmeans_n3.json"

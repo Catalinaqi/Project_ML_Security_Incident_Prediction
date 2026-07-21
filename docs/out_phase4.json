@@ -1,0 +1,61 @@
+{
+  "project": "phase4_data_modeling",
+  "pipeline_stages": {
+    "4.1_algorithm_selection": {
+      "files": [
+        "4.1.algorithm_selection.dbscan.json",
+        "4.1.algorithm_selection.kmeans.json",
+        "4.1.algorithm_selection.summary.json"
+      ]
+    },
+    "4.2_pretrain_analysis": {
+      "files": [
+        "4.2.pretrain_analysis.eps_recommendation.json",
+        "4.2.pretrain_analysis.eps_suggested.json",
+        "4.2.pretrain_analysis.eps_validation_preview.json",
+        "4.2.pretrain_analysis.knn_distance_summary.json",
+        "4.2.pretrain_analysis.knn_distances.elbow.png",
+        "4.2.pretrain_analysis.knn_distances.stats.json",
+        "4.2.pretrain_analysis.sample_metadata.json"
+      ]
+    },
+    "4.3_model_training": {
+      "files": [
+        "4.3.model_training.best_model.pkl",
+        "4.3.model_training.cluster_assignments_sample.parquet",
+        "4.3.model_training.cluster_centroids.parquet",
+        "4.3.model_training.cluster_sizes.json",
+        "4.3.model_training.fit.pkl",
+        "4.3.model_training.hp_search_summary.json",
+        "4.3.model_training.hyperparameter_tuning.dbscan.json",
+        "4.3.model_training.hyperparameter_tuning.kmeans.json",
+        "4.3.model_training.model_card.json"
+      ]
+    },
+    "4.4_test_design": {
+      "files": [
+        "4.4.test_design.evaluation_plan.json"
+      ]
+    },
+    "4.5_model_evaluation": {
+      "files": [
+        "4.5.model_evaluation.ari.kmeans_n2.json",
+        "4.5.model_evaluation.ari.kmeans_n3.json",
+        "4.5.model_evaluation.ari_consolidated.json",
+        "4.5.model_evaluation.calinski_harabasz.kmeans_n2.json",
+        "4.5.model_evaluation.calinski_harabasz.kmeans_n3.json",
+        "4.5.model_evaluation.cluster_labels.parquet",
+        "4.5.model_evaluation.cluster_subsets.kmeans_n2.parquet",
+        "4.5.model_evaluation.cluster_subsets.kmeans_n3.parquet",
+        "4.5.model_evaluation.davies_bouldin.kmeans_n2.json",
+        "4.5.model_evaluation.davies_bouldin.kmeans_n3.json",
+        "4.5.model_evaluation.profiling.kmeans_n2.json",
+        "4.5.model_evaluation.profiling.kmeans_n3.json",
+        "4.5.model_evaluation.profiling_consolidated.json",
+        "4.5.model_evaluation.silhouette.kmeans_n2.json",
+        "4.5.model_evaluation.silhouette.kmeans_n3.json",
+        "4.5.model_evaluation.summary.json"
+      ]
+    }
+  }
+}

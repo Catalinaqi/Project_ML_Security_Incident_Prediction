@@ -1,0 +1,58 @@
+{
+  "01_Identificatori": {
+    "descrizione": "Dati tecnici di chiave primaria e gerarchia necessari per tracciare e unire registri di incidenti e avvisi univoci in tutta l'infrastruttura Microsoft.",
+    "colonne": ["Id", "OrgId", "IncidentId", "AlertId"]
+  },
+  "02_Temporali": {
+    "descrizione": "Dati cronologici essenziali per l'analisi di serie temporali e la ricostruzione della sequenza di un attacco.",
+    "colonne": ["Timestamp"]
+  },
+  "03_Metadati_Rilevamento": {
+    "descrizione": "Informazioni su quale regola o motore di sicurezza ha attivato l'avviso e la sua classificazione tattica secondo il framework MITRE ATT&CK.",
+    "colonne": ["DetectorId", "AlertTitle", "Category", "MitreTechniques"]
+  },
+  "04_Variabili_Target": {
+    "descrizione": "Variabili di output che rappresentano la valutazione umana (triage) dell'incidente. Costituiscono la 'Ground Truth' per l'addestramento supervisionato.",
+    "colonne": ["IncidentGrade", "ActionGrouped", "ActionGranular"]
+  },
+  "05_Entità": {
+    "descrizione": "Definiscono la natura dell'oggetto colpito (utente, file, dispositivo), consentendo di segmentare il tipo di incidente.",
+    "colonne": ["EntityType", "EvidenceRole"]
+  },
+  "06_Proprietà_Device": {
+    "descrizione": "Dettagli tecnici dell'hardware o configurazione del sistema operativo nel dispositivo finale (endpoint) colpito.",
+    "colonne": ["DeviceId", "DeviceName", "OSFamily", "OSVersion"]
+  },
+  "07_Proprietà_File": {
+    "descrizione": "Attributi specifici per la tracciabilità di file dannosi, inclusi hash e percorsi di sistema.",
+    "colonne": ["Sha256", "FileName", "FolderPath"]
+  },
+  "08_Proprietà_Rete": {
+    "descrizione": "Dati di connettività e geolocalizzazione che tracciano la comunicazione con domini esterni o movimenti laterali.",
+    "colonne": ["IpAddress", "Url", "CountryCode", "State", "City"]
+  },
+  "09_Proprietà_Identità": {
+    "descrizione": "Attributi di account utente, vitali per rilevare compromissioni di credenziali o escalation di privilegi.",
+    "colonne": ["AccountSid", "AccountUpn", "AccountObjectId", "AccountName"]
+  },
+  "10_Proprietà_Email": {
+    "descrizione": "Informazioni specifiche per attacchi basati su posta elettronica, inclusi ID dei messaggi e analisi dei filtri antispam.",
+    "colonne": ["NetworkMessageId", "EmailClusterId", "AntispamDirection"]
+  },
+  "11_Proprietà_Registro": {
+    "descrizione": "Attributi di persistenza nel sistema operativo Windows (Registro), spesso sfruttati dal malware.",
+    "colonne": ["RegistryKey", "RegistryValueName", "RegistryValueData"]
+  },
+  "12_Proprietà_Cloud": {
+    "descrizione": "Dati specifici di servizi cloud, applicazioni SaaS e risorse di infrastruttura (Azure/Office 365).",
+    "colonne": ["ApplicationId", "ApplicationName", "OAuthApplicationId", "ResourceIdName", "ResourceType", "Roles"]
+  },
+  "13_Valutazione_Automatica": {
+    "descrizione": "Diagnosi preliminare effettuata dai sistemi automatici di Microsoft (Defender XDR) prima dell'intervento dell'analista umano.",
+    "colonne": ["ThreatFamily", "SuspicionLevel", "LastVerdict"]
+  },
+  "14_Test_Metadati": {
+    "descrizione": "Campi di controllo utilizzati esclusivamente per la partizione e la validazione dei dati nel benchmark di Kaggle.",
+    "colonne": ["Usage"]
+  }
+}

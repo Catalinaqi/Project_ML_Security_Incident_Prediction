@@ -97,7 +97,8 @@ def init_run_phase2(
 
     # Step 3: Configure logging for this run
     task = ctx.task  # str from config metadata
-    run_name = f"run_{task}_{dataset_key}_{ctx.run_id}"
+    #run_name = f"run_{task}_{dataset_key}_{ctx.run_id}"
+    run_name = f"phase_2_{task}_{dataset_key}"
     log_file = config_run_logging(
         output_root=built.config.common_base_config.runtime.output_root,
         run_name=run_name,

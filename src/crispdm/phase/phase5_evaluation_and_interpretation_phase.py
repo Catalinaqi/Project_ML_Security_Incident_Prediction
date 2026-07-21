@@ -1,4 +1,4 @@
-# src/crispdm/phase/phase5_evaluation_and_interpretation_phase.py
+# src/crispdm/phase/.py
 """CRISP-DM Phase 5 orchestrators – Evaluation & Interpretation.
 
 Each function corresponds to a step defined in the pipeline config.
@@ -221,7 +221,7 @@ def run_step_5_1(ctx: RunContext) -> RunContext:
             "n_features": len(feature_names) if feature_names else 0,
         },
     )
-
+    log.info("[5.1] output artifacts: %s", step_cfg.get("output_artifacts", {}))
     log.info("[5.1] done – %d technique(s) interpreted", len(interpreted_profiles))
     return ctx
 
@@ -273,7 +273,6 @@ def _resolve_artifact_path(ctx: RunContext, relative_path: str) -> Path | None:
 # STEP 5.2 — BUSINESS EVALUATION (Confusion matrices & alignment plot)
 # =============================================================================
 
-
 def run_step_5_2(ctx: RunContext) -> RunContext:
     """Execute CRISP-DM Phase 5.2 – Business Evaluation.
 
@@ -315,6 +314,39 @@ def run_step_5_2(ctx: RunContext) -> RunContext:
     # ------------------------------------------------------------------
     read_strategy: dict[str, Any] = dget(ctx.config.phases.phase5_evaluation_and_interpretation, "read_strategy", {})
     train_labels_path_rel: str = read_strategy.get("train_labels", "")
+
+    # df_gt_source = ctx.df_train if hasattr(ctx, "df_train") and ctx.df_train is not None else None
+    # df_gt_for_registry = None  # Variable segura para el registro final
+    #
+    # if df_gt_source is not None and "label" in df_gt_source.columns:
+    #     true_labels: np.ndarray = df_gt_source["label"].values.astype(int)
+    #     df_gt_for_registry = df_gt_source
+    #     log.info("[5.2] loaded ground truth from memory Context (n=%d)", len(true_labels))
+    # else:
+    #     # Fallback a disco
+    #     if not train_labels_path_rel:
+    #         log.error("[5.2] 'train_labels' not configured in phase5 read_strategy")
+    #         raise RuntimeError("[5.2] Missing train_labels path")
+    #
+    #     gt_path = _resolve_artifact_path(ctx, train_labels_path_rel)
+    #     if gt_path is None or not gt_path.exists():
+    #         log.error("[5.2] ground truth file not found: %s", train_labels_path_rel)
+    #         raise FileNotFoundError(f"[5.2] ground truth not found: {train_labels_path_rel}")
+    #
+    #     log.info("[5.2] loading ground truth from %s", gt_path)
+    #     df_gt = pd.read_parquet(gt_path)
+    #     if "label" not in df_gt.columns:
+    #         log.error("[5.2] ground truth file missing 'label' column – columns: %s", df_gt.columns.tolist())
+    #         raise ValueError("[5.2] Missing 'label' column in ground truth")
+    #
+    #     true_labels = df_gt["label"].values.astype(int)
+    #     df_gt_for_registry = df_gt
+    #     log.info("[5.2] ground truth loaded from disk – n=%d, classes=%s", len(true_labels), np.unique(true_labels))
+
+    # ------------------------------------------------------------------
+    # Load ground truth labels (sempre des de disc)
+    # ------------------------------------------------------------------
+    train_labels_path_rel: str = read_strategy.get("train_labels", "")
     if not train_labels_path_rel:
         log.error("[5.2] 'train_labels' not configured in phase5 read_strategy")
         raise RuntimeError("[5.2] Missing train_labels path")
@@ -326,12 +358,18 @@ def run_step_5_2(ctx: RunContext) -> RunContext:
 
     log.info("[5.2] loading ground truth from %s", gt_path)
     df_gt = pd.read_parquet(gt_path)
-    # Expect column 'label' per config (encoded)
     if "label" not in df_gt.columns:
-        log.error("[5.2] ground truth file missing 'label' column – columns: %s", df_gt.columns.tolist())
-        raise ValueError("[5.2] Missing 'label' column in ground truth")
+        # Comprovació de seguretat extra: renombrar 'IncidentGrade' si existeix
+        if "IncidentGrade" in df_gt.columns:
+            df_gt["label"] = df_gt["IncidentGrade"].astype(int)
+            log.info("[5.2] created 'label' column from 'IncidentGrade'")
+        else:
+            log.error("[5.2] ground truth file missing 'label' column – columns: %s", df_gt.columns.tolist())
+            raise ValueError("[5.2] Missing 'label' column in ground truth")
+
     true_labels: np.ndarray = df_gt["label"].values.astype(int)
-    log.info("[5.2] ground truth loaded – n=%d, classes=%s", len(true_labels), np.unique(true_labels))
+    df_gt_for_registry = df_gt
+    log.info("[5.2] ground truth loaded from disk – n=%d, classes=%s", len(true_labels), np.unique(true_labels))
 
     # ------------------------------------------------------------------
     # Load cluster assignments (sample from step 4.3)
@@ -348,9 +386,45 @@ def run_step_5_2(ctx: RunContext) -> RunContext:
 
     log.info("[5.2] loading cluster assignments from %s", ca_path)
     df_ca = pd.read_parquet(ca_path)
-    # The parquet has one column per model (e.g., "kmeans_n2", "kmeans_n3")
+    log.info("[5.2] Columns in cluster assignments: %s", df_ca.columns.tolist())
     available_models = df_ca.columns.tolist()
     log.info("[5.2] available models in assignments: %s", available_models)
+
+
+    # If dimensions differ, truncate ground truth to match cluster assignments
+    # if len(true_labels) != len(df_ca):
+    #     log.warning(
+    #         "[5.2] Dimension mismatch detected. Truncating ground truth "
+    #         "from %d to %d rows to align with cluster assignments.",
+    #         len(true_labels), len(df_ca)
+    #     )
+    #     true_labels = true_labels[:len(df_ca)]
+
+    # ------------------------------------------------------------------
+    # CRÍTICO: Alineación por índice para desalineación de dimensiones (Muestreo 30k)
+    # ------------------------------------------------------------------
+    if len(true_labels) != len(df_ca):
+        # Buscamos la intersección de índices entre el GT original y los clústeres muestreados
+        common_idx = df_gt.index.intersection(df_ca.index)
+
+        if len(common_idx) == len(df_ca):
+            log.info(
+                "[5.2] Muestreo detectado. Alineando ground truth (%d) con clusters (%d) usando índices exactos.",
+                len(true_labels), len(df_ca)
+            )
+            # 1. Filtramos el Ground Truth usando los índices exactos del clustering
+            df_gt = df_gt.loc[df_ca.index]
+
+            # 2. Sobrescribimos true_labels con el nuevo tamaño (30,000)
+            true_labels = df_gt["label"].values.astype(int)
+        else:
+            log.error(
+                "[5.2] Dimension mismatch insalvable: true_labels (%d) vs cluster assignments (%d) "
+                "y los índices no coinciden. Skipping Business Evaluation.",
+                len(true_labels), len(df_ca)
+            )
+            return ctx
+
 
     # ------------------------------------------------------------------
     # Extract technique configurations
@@ -412,15 +486,52 @@ def run_step_5_2(ctx: RunContext) -> RunContext:
     # ------------------------------------------------------------------
     # Generate alignment plot (crosstab_distribution)
     # ------------------------------------------------------------------
+    # crosstab_cfg: dict[str, Any] = techniques.get("crosstab_distribution", {})
+    # if enabled(crosstab_cfg, default=True):
+    #     plot_params = crosstab_cfg.get("params", {})
+    #     targets: List[str] = plot_params.get("targets", [])
+    #     plot_type: str = plot_params.get("plot_type", "stacked_bar")
+    #     output_plot_path: str = crosstab_cfg.get("output", "")
+    #
+    #     if targets:
+    #         cluster_labels_dict: Dict[str, np.ndarray] = {}
+    #         missing_targets = []
+    #         for target in targets:
+    #             if target in df_ca.columns:
+    #                 cluster_labels_dict[target] = df_ca[target].values.astype(int)
+    #             else:
+    #                 missing_targets.append(target)
+    #                 log.warning("[5.2] target '%s' not in assignments – skipping in plot", target)
+    #         if missing_targets:
+    #             log.warning("[5.2] targets missing from data: %s", missing_targets)
+    #
+    #         if cluster_labels_dict:
+    #             fig = generate_alignment_plot(
+    #                 cluster_labels_dict=cluster_labels_dict,
+    #                 true_labels=true_labels,
+    #                 targets=[t for t in targets if t in cluster_labels_dict],
+    #                 plot_type=plot_type,
+    #             )
+    #
+    #             # Save plot
+    #             if output_plot_path:
+    #                 save_figure(fig, out_path=phase5_dir / output_plot_path, dpi=150)
+    #                 log.info("[5.2] saved alignment plot to %s", output_plot_path)
+    #             plt.close(fig)
+    #         else:
+    #             log.warning("[5.2] no valid targets for alignment plot")
+
+    # ------------------------------------------------------------------
+    # Generate alignment plot (crosstab_distribution)
+    # ------------------------------------------------------------------
     crosstab_cfg: dict[str, Any] = techniques.get("crosstab_distribution", {})
     if enabled(crosstab_cfg, default=True):
         plot_params = crosstab_cfg.get("params", {})
         targets: List[str] = plot_params.get("targets", [])
         plot_type: str = plot_params.get("plot_type", "stacked_bar")
-        output_plot_path: str = crosstab_cfg.get("output", "")
+        # output_plot_path NON viene più usato per salvataggio diretto
 
         if targets:
-            # Extract cluster labels for each target model
             cluster_labels_dict: Dict[str, np.ndarray] = {}
             missing_targets = []
             for target in targets:
@@ -440,14 +551,16 @@ def run_step_5_2(ctx: RunContext) -> RunContext:
                     plot_type=plot_type,
                 )
 
-                # Save plot
-                if output_plot_path:
-                    #save_figure(fig, phase5_dir / output_plot_path, dpi=150)
-                    save_figure(fig, out_path=phase5_dir / output_plot_path, dpi=150)
-                    log.info("[5.2] saved alignment plot to %s", output_plot_path)
-                plt.close(fig)
+                # Salva la figura nel contesto per il registry writer
+                ctx.artifacts["alignment_plot"] = fig
+                log.info("[5.2] generated alignment plot – stored in ctx.artifacts")
+
+                # NON chiudere la figura qui; lo farà il registry writer.
+                # plt.close(fig)  <- rimuovi o commenta
             else:
                 log.warning("[5.2] no valid targets for alignment plot")
+    else:
+        log.info("[5.2] crosstab_distribution disabled – skipping")
 
     # ------------------------------------------------------------------
     # Save consolidated output artifacts
@@ -465,13 +578,11 @@ def run_step_5_2(ctx: RunContext) -> RunContext:
         save_json(consolidated, phase5_dir / cm_consolidated_path)
         log.info("[5.2] saved consolidated confusion matrices to %s", cm_consolidated_path)
 
-    # alignment_plot is already saved above
-
     # ------------------------------------------------------------------
     # Store in context artifacts
     # ------------------------------------------------------------------
     ctx.artifacts["confusion_matrices"] = confusion_results
-    ctx.artifacts["alignment_plot_path"] = output_plot_path if crosstab_cfg.get("output") else None
+    #ctx.artifacts["alignment_plot_path"] = output_plot_path if crosstab_cfg.get("output") else None
 
     # ------------------------------------------------------------------
     # Write output artifacts for registry
@@ -480,7 +591,7 @@ def run_step_5_2(ctx: RunContext) -> RunContext:
         ctx,
         step_key=step_key,
         step_cfg=step_cfg,
-        df_train=df_gt,  # optional, for registry
+        df_train=df_gt_for_registry,  # Usamos la variable segura
         df_test=None,
         extra={
             "models_evaluated": list(confusion_results.keys()),
@@ -488,10 +599,9 @@ def run_step_5_2(ctx: RunContext) -> RunContext:
             "cluster_assignments_source": cluster_assign_path_rel,
         },
     )
-
+    log.info("[5.2] output artifacts: %s", step_cfg.get("output_artifacts", {}))
     log.info("[5.2] done – %d confusion matrix(es) computed", len(confusion_results))
     return ctx
-
 
 # =============================================================================
 # STEP 5.3 — PROCESS AUDIT (leakage check & reproducibility)
@@ -632,7 +742,7 @@ def run_step_5_3(ctx: RunContext) -> RunContext:
             "audit_techniques": list(audit_results.keys()),
         },
     )
-
+    log.info("[5.3] output artifacts: %s", step_cfg.get("output_artifacts", {}))
     log.info("[5.3] done – audit results saved")
     return ctx
 
@@ -794,7 +904,7 @@ def run_step_5_4(ctx: RunContext) -> RunContext:
             "threshold_met": readiness_metrics.get("threshold_met", False),
         },
     )
-
+    log.info("[5.4] output artifacts: %s", step_cfg.get("output_artifacts", {}))
     log.info("[5.4] done – deployment readiness evaluated, recommendations generated")
     return ctx
 

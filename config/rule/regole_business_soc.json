@@ -1,0 +1,96 @@
+{
+  "Modello_Concettuale_SOC": {
+    "1_Analista_SOC_Valutazione": {
+      "concetto": "Il lettore e il suo verdetto (Documento finale - MANUALE)",
+      "descrizione": "Contiene la classificazione umana dei risultati e le azioni di mitigazione prese dagli analisti del SOC (Ground Truth).",
+      "colonne_incluse": [
+        { "nome": "IncidentGrade", "tipo": "object", "descrizione": "Gravità dell’incidente assegnata dall'analista (es. Low, Medium, High)." },
+        { "nome": "ActionGrouped", "tipo": "object", "descrizione": "Azione aggregata di rimedio eseguita dal SOC (es. blocked, allowed)." },
+        { "nome": "ActionGranular", "tipo": "object", "descrizione": "Dettaglio specifico dell'azione di risposta eseguita." },
+        { "nome": "Usage", "tipo": "object", "descrizione": "Tag di controllo per il partizionamento dei datos nel benchmark." }
+      ]
+    },
+    "2_Sistema_XDR_Eventi_Alerts": {
+      "concetto": "I verbi e i paragrafi (Azione e Raggruppamento - AUTOMATICO)",
+      "descrizione": "Telemetria generata dai motori di rilevamento e classificazione euristica iniziale eseguita dagli algoritmi ML di XDR.",
+      "subcategorie": {
+        "2a_Identificatori_Gerarchia": [
+          { "nome": "Id", "tipo": "int64", "descrizione": "Identificativo univoco dell’evento registrato." },
+          { "nome": "OrgId", "tipo": "int64", "descrizione": "ID dell’organizzazione cliente colpita." },
+          { "nome": "IncidentId", "tipo": "int64", "descrizione": "Identificativo dell’incidente aggregato dall'XDR." },
+          { "nome": "AlertId", "tipo": "int64", "descrizione": "Identificativo della specifica allerta." }
+        ],
+        "2b_Temporali": [
+          { "nome": "Timestamp", "tipo": "object", "descrizione": "Data e ora dell’evento telemetrico." }
+        ],
+        "2c_Metadati_Rilevamento": [
+          { "nome": "DetectorId", "tipo": "int64", "descrizione": "ID del componente o regola di sicurezza che ha fatto scattare l'allerta." },
+          { "nome": "AlertTitle", "tipo": "int64", "descrizione": "Codice numerico associato al titolo dell’allerta." },
+          { "nome": "Category", "tipo": "object", "descrizione": "Categoria dell’allerta (es: malware, phishing, esfiltrazione)." },
+          { "nome": "MitreTechniques", "tipo": "object", "descrizione": "Identificatori delle tecniche MITRE ATT&CK coinvolte." }
+        ],
+        "2d_Valutazione_Automatica_AI": [
+          { "nome": "ThreatFamily", "tipo": "object", "descrizione": "Famiglia della minaccia identificata automaticamente dall'XDR." },
+          { "nome": "SuspicionLevel", "tipo": "object", "descrizione": "Livello di sospetto calcolato automaticamente dal sistema." },
+          { "nome": "LastVerdict", "tipo": "object", "descrizione": "Esito finale dell'analisi automatica della macchina." }
+        ]
+      }
+    },
+    "3_Entita_Sostantivi": {
+      "concetto": "Gli attori e gli oggetti (Gli elementi della rete - AUTOMATICO)",
+      "descrizione": "Sottogruppi di proprietà tecniche suddivisi per dominio tecnologico colpito.",
+      "subcategorie": {
+        "3a_Proprieta_Device": [
+          { "nome": "DeviceId", "tipo": "int64", "descrizione": "Identificativo univoco del dispositivo interessato." },
+          { "nome": "DeviceName", "tipo": "int64", "descrizione": "Nome codificato del dispositivo." },
+          { "nome": "OSFamily", "tipo": "int64", "descrizione": "Famiglia del sistema operativo dell'endpoint." },
+          { "nome": "OSVersion", "tipo": "int64", "descrizione": "Versione specifica del sistema operativo." }
+        ],
+        "3b_Proprieta_File": [
+          { "nome": "Sha256", "tipo": "int64", "descrizione": "Hash SHA256 del file identificato come sospetto." },
+          { "nome": "FileName", "tipo": "int64", "descrizione": "Nome del file associato all'evento." },
+          { "nome": "FolderPath", "tipo": "int64", "descrizione": "Percorso completo del file nel sistema." }
+        ],
+        "3c_Proprieta_Rete": [
+          { "nome": "IpAddress", "tipo": "int64", "descrizione": "Indirizzo IP pubblico o privato coinvolto nella connessione." },
+          { "nome": "Url", "tipo": "int64", "descrizione": "Link o URL sospetti rilevati nella telemetria di rete." },
+          { "nome": "CountryCode", "tipo": "int64", "descrizione": "Codice geografico del paese di origine/destinazione del traffico." },
+          { "nome": "State", "tipo": "int64", "descrizione": "Stato o regione associata all'attività di rete." },
+          { "nome": "City", "tipo": "int64", "descrizione": "Città associata alla geolocalizzazione dell'evento." }
+        ],
+        "3d_Proprieta_Identita": [
+          { "nome": "AccountSid", "tipo": "int64", "descrizione": "Identificativo di sicurezza (SID) dell'account utente." },
+          { "nome": "AccountUpn", "tipo": "int64", "descrizione": "User Principal Name dell'account coinvolto." },
+          { "nome": "AccountObjectId", "tipo": "int64", "descrizione": "ID dell'oggetto all'interno di Azure Active Directory." },
+          { "nome": "AccountName", "tipo": "int64", "descrizione": "Nome dell'account utente codificato." }
+        ],
+        "3e_Proprieta_Email": [
+          { "nome": "NetworkMessageId", "tipo": "int64", "descrizione": "Identificativo univoco del messaggio email nella rete." },
+          { "nome": "EmailClusterId", "tipo": "float64", "descrizione": "ID del cluster di email simili o campagne di phishing mascherate." },
+          { "nome": "AntispamDirection", "tipo": "object", "descrizione": "Direzione del flusso email analizzato dall'antispam (Inbound/Outbound)." }
+        ],
+        "3f_Proprieta_Registro": [
+          { "nome": "RegistryKey", "tipo": "int64", "descrizione": "Chiave del registro di sistema Windows modificata o letta." },
+          { "nome": "RegistryValueName", "tipo": "int64", "descrizione": "Nome del valore all'interno della chiave di registro." },
+          { "nome": "RegistryValueData", "tipo": "int64", "descrizione": "Dati effettivi scritti o presenti nel registro di sistema." }
+        ],
+        "3g_Proprieta_Cloud": [
+          { "nome": "ApplicationId", "tipo": "int64", "descrizione": "ID dell'applicazione cloud o SaaS registrata." },
+          { "nome": "ApplicationName", "tipo": "int64", "descrizione": "Nome dell'applicazione cloud coinvolta." },
+          { "nome": "OAuthApplicationId", "tipo": "int64", "descrizione": "ID dell'applicazione OAuth che richiede i permessi." },
+          { "nome": "ResourceIdName", "tipo": "int64", "descrizione": "Nome della risorsa cloud infrastrutturale (Azure)." },
+          { "nome": "ResourceType", "tipo": "object", "descrizione": "Tipo di risorsa cloud (es. Virtual Machine, Storage Account)." },
+          { "nome": "Roles", "tipo": "object", "descrizione": "Ruoli o privileges associati all'entità nel cloud." }
+        ]
+      }
+    },
+    "4_Evidenze_Contesto": {
+      "concetto": "La sintassi e le frasi (Il contesto tattico - AUTOMATICO)",
+      "descrizione": "Campi di correlazione automatica che definiscono la sintassi logica dell'incidente.",
+      "colonne_incluse": [
+        { "nome": "EntityType", "tipo": "object", "descrizione": "Natura dell'entità coinvolta (User, File, Machine, Registry, etc.)." },
+        { "nome": "EvidenceRole", "tipo": "object", "descrizione": "Il ruolo specifico della prova nel contesto dell'attacco (es. Impacted, Triggering)." }
+      ]
+    }
+  }
+}

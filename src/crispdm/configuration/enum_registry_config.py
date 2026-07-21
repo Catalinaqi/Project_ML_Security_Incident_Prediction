@@ -250,6 +250,56 @@ class StepOutputArtifact(str, Enum):
     TEST_PREPARED="test_prepared"
     TRANSFORMERS_PIPELINE="transformers_pipeline"
 
+    # ──────────────────────────────────────────────────────────────────────────
+    # Phase 4 – Data Modeling
+    # ──────────────────────────────────────────────────────────────────────────
+    # Step 4.1
+    ALGORITHMS_SELECTED = "algorithms_selected"
+
+    # Step 4.2
+    EPS_RECOMMENDATION = "eps_recommendation"
+    KNN_DISTANCE_SUMMARY = "knn_distance_summary"
+    SAMPLE_METADATA = "sample_metadata"
+    EPS_VALIDATION_PREVIEW = "eps_validation_preview"
+
+    # Step 4.3
+    BEST_MODEL = "best_model"
+    MODEL_CARD = "model_card"
+    VALIDATION_METRICS = "validation_metrics"
+    CLUSTER_ASSIGNMENTS_SAMPLE = "cluster_assignments_sample"
+    CLUSTER_CENTROIDS = "cluster_centroids"
+    CLUSTER_SIZES = "cluster_sizes"
+    HP_SEARCH_SUMMARY = "hp_search_summary"
+    CLUSTER_FEATURE_PROFILES = "cluster_feature_profiles"
+
+    # Step 4.4
+    EVALUATION_PLAN = "evaluation_plan"
+
+    # Step 4.5
+    CLUSTER_LABELS = "cluster_labels"
+    SUMMARY_COMPARISON = "summary_comparison"
+    CONSOLIDATED_ARI = "consolidated_ari"
+    CONSOLIDATED_PROFILING = "consolidated_profiling"
+    CLUSTER_SUBSETS_N2 = "cluster_subsets_n2"
+    CLUSTER_SUBSETS_N3 = "cluster_subsets_n3"
+
+    # ──────────────────────────────────────────────────────────────────────────
+    # Phase 5 – Evaluation & Interpretation
+    # ──────────────────────────────────────────────────────────────────────────
+    # Step 5.1
+    THREAT_KNOWLEDGE_BASE = "threat_knowledge_base"
+
+    # Step 5.2
+    CONFUSION_MATRICES = "confusion_matrices"
+    ALIGNMENT_PLOT = "alignment_plot"
+
+    # Step 5.3
+    REPRODUCIBILITY_CERTIFICATE = "reproducibility_certificate"
+
+    # Step 5.4
+    DEPLOYMENT_READINESS = "deployment_readiness"
+    RECOMMENDATIONS = "recommendations"
+
 class StepsPhase(str, Enum):  # noqa: D101
     STEP_2_1 = "step_2_1_data_acquisition"
     STEP_2_2 = "step_2_2_data_description"

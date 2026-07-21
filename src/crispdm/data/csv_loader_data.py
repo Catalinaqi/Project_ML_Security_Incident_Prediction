@@ -246,7 +246,7 @@ def _load_csv_random_sample(
     return df
 
 
-def _load_csv_stratified_sample(
+def _load_csv_stratified_sample_old(
         path: str,
         *,
         csv_params: Optional[Dict[str, Any]],
@@ -472,6 +472,297 @@ def _load_csv_stratified_sample(
         df[stratify_column].value_counts().to_dict(),
     )
     return df
+
+def _load_csv_stratified_sample_old_v2(
+        path: str,
+        *,
+        csv_params: Optional[Dict[str, Any]],
+        sample_rows: int,
+        chunksize: int,
+        random_state: int,
+        stratify_column: str,
+) -> pd.DataFrame:
+    """
+    Load a stratified sample from a large relational CSV without loading the full file.
+
+    STRATEGY: Two-Pass Relational Sampling (Master's Thesis Grade)
+        Pass 1: Read ONLY the relation ID (IncidentId) and the stratify_column from
+                the entire file to learn the TRUE global distribution and calculate
+                the average rows per incident. (Very low memory footprint).
+        Pass 2: Select a stratified sample of *IncidentIds*, then iterate the CSV
+                in chunks and extract 100% of the rows belonging to the selected
+                incidents.
+
+    This guarantees:
+      1. Perfect global statistical distribution (solves chunk-bias).
+      2. Perfect relational hierarchy (Evidence -> Alert -> Incident).
+
+    Parameters
+    ----------
+    path : str
+        Relative or absolute path to the CSV file.
+    csv_params : Optional[Dict[str, Any]]
+        Extra keyword arguments forwarded to ``pd.read_csv()``.
+    sample_rows : int
+        Target number of rows in the returned DataFrame.
+    chunksize : int
+        Number of rows read per chunk iteration.
+    random_state : int
+        Seed for the random sampler — ensures reproducibility.
+    stratify_column : str
+        Name of the column to stratify by (e.g. ``"IncidentGrade"``).
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with approximately ``sample_rows`` rows. The exact number
+        will slightly vary to prevent cutting a relational incident in half.
+    """
+    resolved = resolve_path(path)
+    params: Dict[str, Any] = dict(csv_params or {})
+    relational_id_column = "IncidentId"  # El ancla relacional para GUIDE dataset
+
+    log.debug(
+        "[_load_csv_stratified_sample] resolved path=%s target_rows=%d "
+        "chunksize=%d random_state=%d stratify_column=%s",
+        resolved, sample_rows, chunksize, random_state, stratify_column
+    )
+
+    if not resolved.exists():
+        log.error("[_load_csv_stratified_sample] file not found path=%s", resolved)
+        raise FileNotFoundError(f"CSV file not found: {resolved}")
+
+    params_filtered = _filter_read_csv_kwargs(params)
+
+    # =========================================================================
+    # PASS 1: METADATA SCAN & INCIDENT-LEVEL STRATIFICATION
+    # =========================================================================
+    # log.info("[_load_csv_stratified_sample] PASS 1: Scanning metadata for relational sampling...")
+    #
+    # # Solo leemos 2 columnas para no saturar la RAM
+    # pass_1_params = params_filtered.copy()
+    # pass_1_params['usecols'] = [relational_id_column, stratify_column]
+    #
+    # try:
+    #     df_meta = pd.read_csv(resolved, **pass_1_params)
+    # except Exception as e:
+    #     log.error("[_load_csv_stratified_sample] Error in Pass 1 reading metadata: %s", e)
+    #     raise
+
+    # =========================================================================
+    # PASS 1: METADATA SCAN & INCIDENT-LEVEL STRATIFICATION
+    # =========================================================================
+    log.info("[_load_csv_stratified_sample] PASS 1: Scanning metadata for relational sampling...")
+
+    # Solo leemos 2 columnas para no saturar la RAM
+    pass_1_params = params_filtered.copy()
+    pass_1_params['usecols'] = [relational_id_column, stratify_column]
+
+    # IMPORTANTE: Eliminar parámetros que causan conflicto si la columna no se carga en esta pasada.
+    # Evita el error: "Missing column provided to 'parse_dates': 'Timestamp'"
+    pass_1_params.pop('parse_dates', None)
+    pass_1_params.pop('dtype', None)
+    pass_1_params.pop('converters', None)
+
+    try:
+        df_meta = pd.read_csv(resolved, **pass_1_params)
+    except Exception as e:
+        log.error("[_load_csv_stratified_sample] Error in Pass 1 reading metadata: %s", e)
+        raise
+
+    total_rows_universe = len(df_meta)
+
+    # 1. Obtener incidentes únicos (1 fila por incidente)
+    df_incidents = df_meta.drop_duplicates(subset=[relational_id_column])
+    total_incidents_universe = len(df_incidents)
+
+    if total_incidents_universe == 0:
+        return pd.DataFrame()
+
+    # 2. Estimar cuántos incidentes necesitamos extraer para alcanzar ~sample_rows
+    avg_rows_per_incident = total_rows_universe / total_incidents_universe
+    target_incidents = max(1, int(sample_rows / avg_rows_per_incident))
+
+    log.info(
+        "[_load_csv_stratified_sample] Pass 1 complete. Universe: %d rows, %d incidents. "
+        "Avg rows/incident: %.2f. Target incidents to sample: %d",
+        total_rows_universe, total_incidents_universe, avg_rows_per_incident, target_incidents
+    )
+
+    # 3. Estratificación Real (Nivel Incidente)
+    # Aquí calculamos las proporciones basándonos en TODO el dataset de 2GB
+    sampled_incidents = (
+        df_incidents.groupby(stratify_column, group_keys=False)
+        .apply(
+            lambda x: x.sample(
+                n=min(len(x), max(1, int(target_incidents * len(x) / total_incidents_universe))),
+                random_state=random_state
+            )
+        )
+    )
+
+    valid_incident_ids = set(sampled_incidents[relational_id_column])
+
+    log.info(
+        "[_load_csv_stratified_sample] Stratification done. Selected %d distinct incidents. "
+        "Stratum distribution: %s",
+        len(valid_incident_ids), sampled_incidents[stratify_column].value_counts().to_dict()
+    )
+
+    # =========================================================================
+    # PASS 2: FULL DATA EXTRACTION (CHUNKED)
+    # =========================================================================
+    log.info("[_load_csv_stratified_sample] PASS 2: Extracting full relational blocks...")
+
+    collected_dfs: list[pd.DataFrame] = []
+    reader = pd.read_csv(resolved, chunksize=chunksize, **params_filtered)
+    rows_collected = 0
+
+    for chunk in reader:
+        # Filtramos el chunk: solo nos quedamos con las filas cuyos IncidentId ganaron el sorteo
+        mask = chunk[relational_id_column].isin(valid_incident_ids)
+        filtered_chunk = chunk[mask]
+
+        if not filtered_chunk.empty:
+            collected_dfs.append(filtered_chunk)
+            rows_collected += len(filtered_chunk)
+
+    if not collected_dfs:
+        log.warning("[_load_csv_stratified_sample] No rows collected in Pass 2.")
+        return pd.DataFrame()
+
+    # Concatenamos todo. NO aplicamos `.sample()` aquí para no romper los incidentes.
+    df_final = pd.concat(collected_dfs, ignore_index=True)
+
+    log.info(
+        "[_load_csv_stratified_sample] Extraction complete. rows=%d cols=%d path=%s. "
+        "Relational integrity preserved.",
+        len(df_final), df_final.shape[1], resolved
+    )
+
+    return df_final
+
+def _load_csv_stratified_sample(
+        path: str,
+        *,
+        csv_params: Optional[Dict[str, Any]],
+        sample_rows: int,
+        chunksize: int,
+        random_state: int,
+        stratify_column: str,
+) -> pd.DataFrame:
+    """
+    Load a stratified sample from a large relational CSV.
+
+    STRATEGY: Hybrid Two-Pass Relational Sampling
+        Pass 1 (DuckDB): Ultra-fast metadata scan to learn the true global
+                         distribution and extract unique IncidentIds.
+        Pass 2 (Pandas): Chunked iteration to extract 100% of the rows for
+                         the selected incidents, preserving YAML data types.
+    """
+    resolved = resolve_path(path)
+    params: Dict[str, Any] = dict(csv_params or {})
+    relational_id_column = "IncidentId"
+
+    log.debug(
+        "[_load_csv_stratified_sample] resolved path=%s target_rows=%d "
+        "chunksize=%d random_state=%d stratify_column=%s",
+        resolved, sample_rows, chunksize, random_state, stratify_column
+    )
+
+    if not resolved.exists():
+        raise FileNotFoundError(f"CSV file not found: {resolved}")
+
+    params_filtered = _filter_read_csv_kwargs(params)
+
+    # =========================================================================
+    # PASS 1: METADATA SCAN (Powered by DuckDB)
+    # =========================================================================
+    log.info("[_load_csv_stratified_sample] PASS 1: Scanning metadata with DuckDB (Ultra-fast)...")
+
+    import duckdb
+
+    # Extraer el delimitador del YAML o usar coma por defecto
+    delim = params_filtered.get('sep', ',')
+
+    try:
+        # Query 1: Obtener el total de filas para calcular el ratio
+        query_count = f"SELECT COUNT(*) FROM read_csv_auto('{resolved}', delim='{delim}')"
+        total_rows_universe = duckdb.query(query_count).fetchone()[0]
+
+        # Query 2: Extraer solo los Incidentes únicos y su Grado
+        query_incidents = f"""
+            SELECT DISTINCT {relational_id_column}, {stratify_column} 
+            FROM read_csv_auto('{resolved}', delim='{delim}')
+        """
+        df_incidents = duckdb.query(query_incidents).to_df()
+
+    except Exception as e:
+        log.error("[_load_csv_stratified_sample] Error in Pass 1 (DuckDB): %s", e)
+        raise
+
+    total_incidents_universe = len(df_incidents)
+
+    if total_incidents_universe == 0:
+        return pd.DataFrame()
+
+    avg_rows_per_incident = total_rows_universe / total_incidents_universe
+    target_incidents = max(1, int(sample_rows / avg_rows_per_incident))
+
+    log.info(
+        "[_load_csv_stratified_sample] Pass 1 complete. Universe: %d rows, %d incidents. "
+        "Avg rows/incident: %.2f. Target incidents: %d",
+        total_rows_universe, total_incidents_universe, avg_rows_per_incident, target_incidents
+    )
+
+    # Estratificación a Nivel Incidente
+    sampled_incidents = (
+        df_incidents.groupby(stratify_column, group_keys=False)
+        .apply(
+            lambda x: x.sample(
+                n=min(len(x), max(1, int(target_incidents * len(x) / total_incidents_universe))),
+                random_state=random_state
+            )
+        )
+    )
+
+    valid_incident_ids = set(sampled_incidents[relational_id_column])
+
+    log.info(
+        "[_load_csv_stratified_sample] Stratification done. Selected %d distinct incidents.",
+        len(valid_incident_ids)
+    )
+
+    # =========================================================================
+    # PASS 2: FULL DATA EXTRACTION (Pandas Chunked)
+    # =========================================================================
+    log.info("[_load_csv_stratified_sample] PASS 2: Extracting relational blocks via Pandas chunks...")
+
+    collected_dfs: list[pd.DataFrame] = []
+    reader = pd.read_csv(resolved, chunksize=chunksize, **params_filtered)
+    rows_collected = 0
+
+    for chunk in reader:
+        mask = chunk[relational_id_column].isin(valid_incident_ids)
+        filtered_chunk = chunk[mask]
+
+        if not filtered_chunk.empty:
+            collected_dfs.append(filtered_chunk)
+            rows_collected += len(filtered_chunk)
+
+    if not collected_dfs:
+        log.warning("[_load_csv_stratified_sample] No rows collected in Pass 2.")
+        return pd.DataFrame()
+
+    df_final = pd.concat(collected_dfs, ignore_index=True)
+
+    log.info(
+        "[_load_csv_stratified_sample] Extraction complete. rows=%d cols=%d. "
+        "Relational integrity preserved.",
+        len(df_final), df_final.shape[1]
+    )
+
+    return df_final
 
 def _load_csv_chunks(
         path: str,

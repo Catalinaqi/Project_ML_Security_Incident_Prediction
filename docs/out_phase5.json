@@ -1,0 +1,34 @@
+{
+  "project": "phase5_evaluation_and_interpretation",
+  "pipeline_stages": {
+    "5.1_interpretation": {
+      "files": [
+        "5.1.interpretation.final_cluster_rules.json",
+        "5.1.interpretation.kmeans_n2_profiles.json",
+        "5.1.interpretation.kmeans_n3_profiles.json"
+      ]
+    },
+    "5.5.2_business_evaluation": {
+      "files": [
+        "5.2.business_evaluation.alignment_chart.png",
+        "5.2.business_evaluation.confusion_matrix.dbscan_collapsed.json",
+        "5.2.business_evaluation.confusion_matrix.kmeans_n2.json",
+        "5.2.business_evaluation.confusion_matrix.kmeans_n3.json",
+        "5.2.business_evaluation.soc_confusion_matrices.json"
+      ]
+    },
+    "5.3_process_audit": {
+      "files": [
+        "5.3.process_audit.leakage_results.json",
+        "5.3.process_audit.reproducibility_report.json",
+        "5.3.process_audit.seed_validation.json"
+      ]
+    },
+    "5.4_decision_making": {
+      "files": [
+        "5.4.decision_making.readiness_metrics.json",
+        "5.4.decision_making.recommendations.json"
+      ]
+    }
+  }
+}

@@ -1,15 +1,6 @@
 # src/crispdm/phase/phase2_understanding_runner_phase.py
 from __future__ import annotations
-"""
-Why this module exists?
 
-
-Objective:
-
-
-Design Patterns:
-
-"""
 
 # ---------------------------------------------------------------------------
 # SECTION 1 – Standard-library imports

@@ -142,6 +142,16 @@ def generate_alignment_plot(
 
     unique_true = np.sort(np.unique(true_labels))
 
+    # for ax, model_name in zip(axes, targets):
+    #     labels = cluster_labels_dict.get(model_name)
+    #     if labels is None:
+    #         ax.text(0.5, 0.5, f"No data for {model_name}", ha="center", va="center")
+    #         ax.set_title(model_name)
+    #         continue
+    #
+    #     # Build a contingency table
+    #     df = pd.DataFrame({"true": true_labels, "cluster": labels})
+
     for ax, model_name in zip(axes, targets):
         labels = cluster_labels_dict.get(model_name)
         if labels is None:
@@ -149,8 +159,16 @@ def generate_alignment_plot(
             ax.set_title(model_name)
             continue
 
+        # NUEVO: Control defensivo interno para evitar el ValueError del DataFrame
+        if len(true_labels) != len(labels):
+            log.error("Length mismatch for %s: true=%d vs cluster=%d", model_name, len(true_labels), len(labels))
+            ax.text(0.5, 0.5, "Dimension mismatch error", ha="center", va="center", color="red")
+            ax.set_title(f"{model_name} (Error)")
+            continue
+
         # Build a contingency table
         df = pd.DataFrame({"true": true_labels, "cluster": labels})
+
         contingency = pd.crosstab(df["true"], df["cluster"], normalize="index")
 
         # Reindex to ensure all true classes are present (even if empty)
