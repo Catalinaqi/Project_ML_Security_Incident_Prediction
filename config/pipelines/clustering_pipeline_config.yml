@@ -77,7 +77,7 @@ clustering_pipeline_config:
         combine_before_sampling: false
         add_source_column: false
         input_source: "${phases.phase2_data_understanding.steps.step_2_1_data_acquisition.output_artifacts.sample_train_parquet}"
-        #input_source: "phase2_train"  # Lee de outputs de Phase 2
+        #input_source: "phase2_train"  # Legge dagli output della Phase 2
 
       steps:
         # ──────────────────────────────────────────────────────────────────────
@@ -127,19 +127,19 @@ clustering_pipeline_config:
                   params:
                     manual_exclude:
                       - "Id"
-                      - "IncidentGrade"          # target — no entra en clustering
-                      - "ActionGrouped"          # post-triage, >99% missing
-                      - "ActionGranular"         # post-triage, >99% missing
-                      - "EmailClusterId"         # 98.96% missing
-                      - "MitreTechniques"        # multi-value, 57% missing, sin explotar
-                      - "ThreatFamily"           # leakage confirmado fase 2
-                      - "Usage"                  # add because find F2
-                    keep_for_aggregation: # ← : protegidos hasta post-aggregation en 3.3
-                      - "IncidentId"             # clave groupby en 3.3
-                      - "AlertId"                # para n_alerts_per_incident en 3.3
-                      - "EntityType"             # para n_unique_entity_types en 3.3
-                      - "IncidentGrade" # retenida para stratified shuffle en 3.5, dropeada ANTES de array_conversion
-                    leakage_risk_flag: # ← : confirmado suspect_leakage en fase 2
+                      - "IncidentGrade"
+                      - "ActionGrouped"
+                      - "ActionGranular"
+                      - "EmailClusterId"
+                      - "MitreTechniques"
+                      - "ThreatFamily"
+                      - "Usage"
+                    keep_for_aggregation:
+                      - "IncidentId"
+                      - "AlertId"
+                      - "EntityType"
+                      - "IncidentGrade"
+                    leakage_risk_flag:
                       - "SuspicionLevel"
                       - "LastVerdict"
                   output: "3.1.dataset_definition.drop_technical_columns.json"
@@ -176,8 +176,8 @@ clustering_pipeline_config:
                   enabled: true
                   params:
                     numeric_only: true
-                    exclude_columns:          # ← : excluir BIGINTs explícitamente
-                      - "AccountUpn"          # BIGINT — sin valores reales separados
+                    exclude_columns:          # ← escludere esplicitamente i BIGINT
+                      - "AccountUpn"          # BIGINT — senza valori reali separati
                       - "IpAddress"           # BIGINT
                       - "DeviceId"            # BIGINT
                       - "AccountSid"          # BIGINT
@@ -185,12 +185,12 @@ clustering_pipeline_config:
                       - "NetworkMessageId"    # BIGINT
                       - "FileName"            # BIGINT
                       - "Sha256"              # BIGINT
-                      - "Url"                 # BIGINT nullificado en 3.1 — no imputar
-                      - "AlertTitle"          # BIGINT nullificado en 3.1 — no imputar
+                      - "Url"                 # BIGINT annullato in 3.1 — non imputare
+                      - "AlertTitle"          # BIGINT annullato in 3.1 — non imputare
                       - "DetectorId"          # BIGINT
-                      - "OrgId"               # BIGINT/pseudo-categórico
-                      - "ApplicationId"       # pseudo-categórico
-                      - "OAuthApplicationId"  # pseudo-categórico
+                      - "OrgId"               # BIGINT/pseudo-categorico
+                      - "ApplicationId"       # pseudo-categorico
+                      - "OAuthApplicationId"  # pseudo-categorico
                   output: "3.2.missing_data_handling.median_imputation.values.json"
                   notes: >
                     Con la 3.1 corretta, non esistono colonne _real separate. 
@@ -246,11 +246,11 @@ clustering_pipeline_config:
                   params:
                     min_freq: 0.001
                     unseen_category: "OTHER"
-                    exclude_columns:          # ← excluir BIGINTs nullificados
-                      - "Url"                 # nullificado en 3.1, no es categórico string
-                      - "AlertTitle"          # nullificado en 3.1, no es categórico string
-                      - "Url_is_missing"      # binaria, no categórica
-                      - "AlertTitle_is_missing" # binaria, no categórica
+                    exclude_columns:          # ← escludere i BIGINT annullati
+                      - "Url"                 # annullato in 3.1, non è una stringa categorica
+                      - "AlertTitle"          # annullato in 3.1, non è una stringa categorica
+                      - "Url_is_missing"      # binaria, non categorica
+                      - "AlertTitle_is_missing" # binaria, non categorica
                   output: "3.2.categorical_noise.rare_grouping.json"
                   notes: >
                     Procesa columnas object reales: Category, EntityType, EvidenceRole,
@@ -326,7 +326,7 @@ clustering_pipeline_config:
                       - "n_evidences_per_incident"
                       - "n_alerts_per_incident"
                       - "n_unique_entity_types"
-                      - "Timestamp_hour"       # rango 0-23 → escalar para KMeans
+                      - "Timestamp_hour"       # intervallo 0-23 → scalare per KMeans
                   fit_on: "train"
                   output: "3.3.numeric_scaling.standard_scaling.statistics.json"
 
@@ -343,7 +343,7 @@ clustering_pipeline_config:
                       - "EvidenceRole"
                       - "OSFamily"
                       - "DetectorId"
-                      - "AlertTitle_real"     # ← _real confirmada en bigint_cleanup
+                      - "AlertTitle_real"     # ← _real confermata in bigint_cleanup
                       - "OrgId"
                       - "AccountUpn"          # ← BIGINT original, nullified_count=0
                       - "IpAddress"           # ← BIGINT original, nullified_count=0
@@ -356,7 +356,7 @@ clustering_pipeline_config:
               enabled: true
               techniques:
                 ordinal_encoding:
-                  enabled: true
+                  enabled: false
                   params:
                     columns:
                       - "SuspicionLevel"
@@ -364,10 +364,10 @@ clustering_pipeline_config:
                     categories:
                       SuspicionLevel: [ "Low", "Medium", "High" ]
                       LastVerdict: [ "Unknown", "Clean", "Suspicious", "Malicious" ]
-                    leakage_risk: "high"      # confirmado suspect_leakage fase 2
+                    leakage_risk: "high"      # confermato suspect_leakage fase 2
                   output: "3.3.encoding.ordinal_encoding.mappings.json"
-                one_hot_encoding: # req: elegir otra tecnica div
-                  enabled: true
+                one_hot_encoding:
+                  enabled: false
                   params:
                 target_encoding:
                   enabled: false
@@ -382,11 +382,11 @@ clustering_pipeline_config:
                   enabled: true
                   params:
                     columns:
-                      - "Url"                   # BIGINT nullificado, Url_real es la útil
-                      - "AlertTitle"            # BIGINT nullificado, AlertTitle_real es la útil
-                      - "AlertTitle_is_missing" # redundante: AlertTitle ya nullificado
-                      - "IncidentId"            # clave de aggregation, no feature
-                      - "AlertId"               # usada en aggregation, no feature
+                      - "Url"                   # BIGINT annullato, Url_real è quello utile
+                      - "AlertTitle"            # BIGINT annullato, AlertTitle_real è quello utile
+                      - "AlertTitle_is_missing" # ridondante: AlertTitle già annullato
+                      - "IncidentId"            # chiave di aggregazione, non come feature
+                      - "AlertId"               # usata nell'aggregazione, non come feature
                     reason: "identifier_or_redundant_post_aggregation"
                   output: "3.3.column_dropping.dropped_columns.json"
 
@@ -400,7 +400,7 @@ clustering_pipeline_config:
                     columns:
                       - "LastVerdict_is_missing"
                       - "SuspicionLevel_is_missing"
-                      - "Url_is_missing"        # ausencia de URL puede discriminar TP/FP
+                      - "Url_is_missing"        # l'assenza di URL può discriminare TP/FP
                     note: "Binary 0/1 — no scaling needed, preserved as clustering signal"
                   output: "3.3.missing_flags.passthrough.json"
           output_artifacts:
@@ -466,10 +466,10 @@ clustering_pipeline_config:
                 no_split_clustering:
                   enabled: true
                   params:
-                    random_state: 7          # ← CORREGIDO: consistente con random_seed global
+                    random_state: 7
                     shuffle: true
                     strategy: "stratified"
-                    stratify_column: "IncidentGrade" # drop post-shuffle antes de array_conversion
+                    stratify_column: "IncidentGrade" # drop post-shuffle, prima di array_conversion
                   output: "3.5.data_split.no_split_clustering.json"
             dataset_formatting:
               enabled: true
@@ -477,7 +477,7 @@ clustering_pipeline_config:
                 x_y_separation:
                   enabled: false
                   params: { target_col: null }
-                save_auxiliary_labels: # NUEVO — post-shuffle, ANTES del drop de IncidentGrade
+                save_auxiliary_labels:
                   enabled: true
                   params:
                     column: "IncidentGrade"
@@ -492,11 +492,11 @@ clustering_pipeline_config:
                 type_casting:
                   enabled: true
                   params:
-                    # 1. Alineación train/test — drop columnas extra en test
+                    # 1. Allineamento train/test — drop delle colonne extra in test
                     drop_columns:
-                      - "Usage"              # extra en test, confirmado fase 2
-                      - "IncidentGrade"      # drop post-shuffle, antes de array_conversion
-                    # 2. Drop BIGINTs sin señal semántica para clustering
+                      - "Usage"              # extra in test, confermato fase 2
+                      - "IncidentGrade"      # drop post-shuffle, prima di array_conversion
+                    # 2. Drop dei BIGINT senza segnale semantico per il clustering
                     drop_bigint_no_signal:
                       - "DeviceId"
                       - "Sha256"
@@ -519,7 +519,7 @@ clustering_pipeline_config:
                       - "City"
                       - "OSVersion"
                       - "Url_real"
-                    # 3. Columnas object → frequency encoding antes de array_conversion
+                    # 3. Colonne object → frequency encoding prima di array_conversion
                     object_frequency_encode:
                       - "ResourceType"
                       - "Roles"
@@ -540,21 +540,16 @@ clustering_pipeline_config:
                       - "AlertTitle_real"
                       - "OrgId"
                       - "AccountUpn"
-                    # 5. Flags binarias → bool
                     flag_to_bool:
                       - "Url_is_missing"
                       - "LastVerdict_is_missing"
                       - "SuspicionLevel_is_missing"
-                      # AlertTitle_is_missing REMOVIDA — dropeada en 3.3
-
-                    # 6. Ordinales int32 — mantener como int32
-                    # SuspicionLevel y LastVerdict ya son int32, no necesitan cast
                   output: "3.5.dataset_formatting.type_casting.json"
                 array_conversion:
                   enabled: true
                   params:
                     to_numpy: true
-                    unified_dtype: "float32"  # bool y int32 se castean a float32 aquí
+                    unified_dtype: "float32"  # bool e int32 vengono convertiti in float32 qui
                   output: "3.5.dataset_formatting.array_conversion.json"
                 sparse_dense_format:
                   enabled: false
@@ -562,16 +557,14 @@ clustering_pipeline_config:
                   enabled: false
 
           output_artifacts:
-            # --- DATA FINAL ---
+            # --- DATI FINALI ---
             train_prepared: "3.5.data_formatting.a_train_prepared.parquet"
             test_prepared: "3.5.data_formatting.b_test_prepared.parquet"
-            # --- EL CEREBRO DEL PIPELINE ---
+            # --- IL CERVELLO DELLA PIPELINE ---
             transformers_pipeline: "3.5.data_formatting.e_transformers_pipeline.pkl"
-
-            # Solo labels + ID para alineación (no features)
+            # Solo label + ID per l'allineamento (nessuna feature)
             #auxiliary_labels_train: "3.5.data_formatting.auxiliary_labels_train.parquet"
-
-            # --- METADATOS ---
+            # --- METADATI ---
             data_schema_final: "3.5.data_formatting.f_final_schema_report.json"
             pipeline_integrity_check: "3.5.data_formatting.g_serialization_log.json"
 
@@ -583,9 +576,9 @@ clustering_pipeline_config:
       enabled: true
       objective: "Train and optimize clustering algorithms"
       read_strategy:
-        # Features para entrenamiento (X)
+        # Feature per l'addestramento (X)
         input_source: "3.5.data_formatting.a_train_prepared.parquet"
-        #  Labels para validación externa (Y)
+        #  Label per la validazione esterna (Y)
         auxiliary_labels: "3.5.dataset_formatting.save_auxiliary_labels.c_incident_grade_labels_train.parquet"
         input_shape:
           - 198886
@@ -682,10 +675,8 @@ clustering_pipeline_config:
                     strategy: "grid"  # TODO: grid or random
                     scoring: "silhouette"  # TODO: silhouette, davies_bouldin, calinski
                     refit: true
-
-                    # subsample solo para grid search, fit final sobre datos completos
-                    grid_search_sample_size: 15000  # Bajalo de 30k a 15k
-                    metrics_sample_size: 5000       # Bajalo de 10k a 5k
+                    grid_search_sample_size: 15000
+                    metrics_sample_size: 5000
                     random_state: 7
 
                     grids:
@@ -729,8 +720,6 @@ clustering_pipeline_config:
             models_to_evaluate:
               - kmeans_n2
               - kmeans_n3
-            # AJUSTE: evaluar n_clusters=2 Y n_clusters=3 — diferencia silhouette 0.008 es insignificante, n=3 responde pregunta estratégica TP/BP/FP
-
           output_artifacts:
             evaluation_plan: "4.4.test_design.evaluation_plan.json"
 
@@ -745,7 +734,7 @@ clustering_pipeline_config:
             model_evaluation:
               techniques:
                 # ──────────────────────────────────────────────────────────────
-                # Métricas explícitas por modelo (kmeans_n2 vs kmeans_n3)
+                # Metriche esplicite per modello (kmeans_n2 vs kmeans_n3)
                 # ──────────────────────────────────────────────────────────────
                 silhouette:
                   enabled: true
@@ -760,7 +749,7 @@ clustering_pipeline_config:
                 davies_bouldin:
                   enabled: true
                   targets: [ "kmeans_n2", "kmeans_n3" ]
-                  params: { }  # Parámetros por defecto (lower is better)
+                  params: { }  # Parametri predefiniti (più basso è meglio)
                   output:
                     kmeans_n2: "4.5.model_evaluation.davies_bouldin.kmeans_n2.json"
                     kmeans_n3: "4.5.model_evaluation.davies_bouldin.kmeans_n3.json"
@@ -768,7 +757,7 @@ clustering_pipeline_config:
                 calinski_harabasz:
                   enabled: true
                   targets: [ "kmeans_n2", "kmeans_n3" ]
-                  params: { }  # Parámetros por defecto (higher is better)
+                  params: { }  # Parametri predefiniti (più alto è meglio)
                   output:
                     kmeans_n2: "4.5.model_evaluation.calinski_harabasz.kmeans_n2.json"
                     kmeans_n3: "4.5.model_evaluation.calinski_harabasz.kmeans_n3.json"
@@ -794,37 +783,27 @@ clustering_pipeline_config:
                   params:
                     samples_per_cluster: 100
                     top_features: 10
-                    export_cluster_subsets: true        # NUEVO
-                    subset_sample_size: 5000            # filas por cluster exportadas
+                    export_cluster_subsets: true
+                    subset_sample_size: 5000
                     subset_format: "parquet"
-                    # top_features — las 10 features más discriminantes por cluster, crítico para fase 5
                   output:
                     kmeans_n2: "4.5.model_evaluation.profiling.kmeans_n2.json"
                     kmeans_n3: "4.5.model_evaluation.profiling.kmeans_n3.json"
-
                 dbscan:
                   enabled: false
                   # DESHABILITADO: 1093 clusters, scores negativos, no aporta a fase 5
 
           # ──────────────────────────────────────────────────────────────────────
-          # Artifacts consolidados para consumo downstream (Fase 5 y Reporting)
+          # Artefatti consolidati per il consumo downstream (Fase 5 e Reporting)
           # ──────────────────────────────────────────────────────────────────────
           output_artifacts:
             cluster_labels: "4.5.model_evaluation.cluster_labels.parquet"
-            # CRÍTICO — input directo fase 5, asignación cluster por fila (modelo ganador)
-
             summary_comparison: "4.5.model_evaluation.summary.json"
-            # CRÍTICO — go/no-go fase 5, comparación directa n2 vs n3 con decisión automática
-
             consolidated_ari: "4.5.model_evaluation.ari_consolidated.json"
-            # CRÍTICO — responde pregunta estratégica TP/BP/FP (unifica ambos modelos)
-
             consolidated_profiling: "4.5.model_evaluation.profiling_consolidated.json"
-            # CRÍTICO — features dominantes por cluster para interpretación fase 5
-
             cluster_subsets_n2: "4.5.model_evaluation.cluster_subsets.kmeans_n2.parquet"
             cluster_subsets_n3: "4.5.model_evaluation.cluster_subsets.kmeans_n3.parquet"
-            # datasets pequeños por cluster — solicitado por profesor
+
 
     # ════════════════════════════════════════════════════════════════════════════
     # PHASE 5: EVALUATION & INTERPRETATION
